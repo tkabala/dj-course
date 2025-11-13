@@ -16,9 +16,17 @@ CORPORA_FILES["ALL"] = [
     FILE for LIST in CORPORA_FILES.values() for FILE in LIST
 ]
 
-def get_corpus_file(corpus_name: str, glob_pattern: str) -> Path:
+def get_corpus_file(corpus_name: str, glob_pattern: str) -> list[Path]:
     if corpus_name not in CORPORA_FILES:
         raise ValueError(f"Corpus {corpus_name} not found")
+
+    # Special case for 'ALL': collect files from all corpora
+    if corpus_name == "ALL":
+        all_files = []
+        for name, directory in CORPORA_DIRS.items():
+            all_files.extend(directory.glob(glob_pattern))
+        return all_files
+
     return list(CORPORA_DIRS[corpus_name].glob(glob_pattern))
 
 if __name__ == "__main__":    
