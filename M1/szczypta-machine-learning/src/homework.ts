@@ -14,20 +14,18 @@ import { displayVector, displayMatrix } from "./display";
 
 // PROŚBA: jeśli znasz rozwiązanie, to nie spamuj discorda - a przynajmniej nie od razu. Pozwól innym pomóżdżyć 😎
 
-const { WK_Matrix, WQ_Matrix, X_Input_Matrix } = fromJSONFile(jsonFilePath('case-1.json'));
-// const { WK_Matrix, WQ_Matrix, X_Input_Matrix } = fromJSONFile(jsonFilePath('case-2.json'));
-// const { WK_Matrix, WQ_Matrix, X_Input_Matrix } = fromJSONFile(jsonFilePath('case-3.json'));
-// const { WK_Matrix, WQ_Matrix, X_Input_Matrix } = fromJSONFile(jsonFilePath('case-4.json'));
-
-console.log('WK_Matrix');
-console.log(displayMatrix(WK_Matrix, -1));
-console.log('WQ_Matrix');
-console.log(displayMatrix(WQ_Matrix, -1));
-console.log('X_Input_Matrix');
-console.log(displayMatrix(X_Input_Matrix, -1));
-
-const x1_vector = X_Input_Matrix[0];
-console.log('x1_vector');
-console.log(displayVector(x1_vector, -1));
-
 // przypomnienie zadania: naley policzyć "attention matrix S"
+
+for (let caseNum = 1; caseNum <= 4; caseNum++) {
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`CASE ${caseNum}`);
+    console.log('='.repeat(60));
+
+    const { WK_Matrix, WQ_Matrix, X_Input_Matrix } = fromJSONFile(jsonFilePath(`case-${caseNum}.json`));
+
+    var Q_Matrix = multiplyMatrices(X_Input_Matrix, WQ_Matrix)
+    var K_Matrix = multiplyMatrices(X_Input_Matrix, WK_Matrix)
+    var S_Matrix = multiplyMatrices(Q_Matrix, transpose(K_Matrix))
+    console.log('S_Matrix');
+    console.log(displayMatrix(S_Matrix, -1));
+}
