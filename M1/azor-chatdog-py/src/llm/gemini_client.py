@@ -73,23 +73,30 @@ class GeminiLLMClient:
     Provides a clean interface for chat sessions, token counting, and configuration.
     """
     
-    def __init__(self, model_name: str, api_key: str):
+    def __init__(self, model_name: str, api_key: str, temperature: float = 0.7,
+                 top_p: float = 1.0, top_k: int = 40):
         """
         Initialize the Gemini LLM client with explicit parameters.
-        
+
         Args:
             model_name: Model to use (e.g., 'gemini-2.5-flash')
             api_key: Google Gemini API key
-        
+            temperature: Controls randomness (0.0-2.0)
+            top_p: Nucleus sampling parameter (0.0-1.0)
+            top_k: Number of top tokens to sample from
+
         Raises:
             ValueError: If api_key is empty or None
         """
         if not api_key:
             raise ValueError("API key cannot be empty or None")
-        
+
         self.model_name = model_name
         self.api_key = api_key
-        
+        self.temperature = temperature
+        self.top_p = top_p
+        self.top_k = top_k
+
         # Initialize the client during construction
         self._client = self._initialize_client()
     
@@ -107,22 +114,31 @@ class GeminiLLMClient:
     def from_environment(cls) -> 'GeminiLLMClient':
         """
         Factory method that creates a GeminiLLMClient instance from environment variables.
-        
+
         Returns:
             GeminiLLMClient instance initialized with environment variables
-            
+
         Raises:
             ValueError: If required environment variables are not set
         """
         load_dotenv()
-    
+
         # Walidacja z Pydantic
         config = GeminiConfig(
             model_name=os.getenv('MODEL_NAME', 'gemini-2.5-flash'),
-            gemini_api_key=os.getenv('GEMINI_API_KEY', '')
+            gemini_api_key=os.getenv('GEMINI_API_KEY', ''),
+            temperature=float(os.getenv('TEMPERATURE', 0.7)),
+            top_p=float(os.getenv('TOP_P', 1.0)),
+            top_k=int(os.getenv('TOP_K', 40))
         )
-        
-        return cls(model_name=config.model_name, api_key=config.gemini_api_key)
+
+        return cls(
+            model_name=config.model_name,
+            api_key=config.gemini_api_key,
+            temperature=config.temperature,
+            top_p=config.top_p,
+            top_k=config.top_k
+        )
     
     def _initialize_client(self) -> genai.Client:
         """
@@ -176,7 +192,10 @@ class GeminiLLMClient:
             history=gemini_history,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
-                thinking_config=types.ThinkingConfig(thinking_budget=thinking_budget)
+                thinking_config=types.ThinkingConfig(thinking_budget=thinking_budget),
+                temperature=self.temperature,
+                top_p=self.top_p,
+                top_k=self.top_k
             )
         )
         

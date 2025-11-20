@@ -16,7 +16,8 @@ class OpenAIChatSession:
     Manages conversation history and provides send_message() and get_history() methods.
     """
 
-    def __init__(self, openai_client: OpenAI, model_name: str, system_instruction: str, history: Optional[List[Dict]] = None):
+    def __init__(self, openai_client: OpenAI, model_name: str, system_instruction: str, history: Optional[List[Dict]] = None,
+                 temperature: float = 0.7, top_p: float = 1.0):
         """
         Initialize the OpenAI chat session.
 
@@ -25,11 +26,15 @@ class OpenAIChatSession:
             model_name: Model name to use for completions
             system_instruction: System prompt for the assistant
             history: Previous conversation history in universal format
+            temperature: Controls randomness (0.0-2.0)
+            top_p: Nucleus sampling parameter (0.0-1.0)
         """
         self.openai_client = openai_client
         self.model_name = model_name
         self.system_instruction = system_instruction
         self._history = history or []
+        self.temperature = temperature
+        self.top_p = top_p
 
     def send_message(self, text: str) -> Any:
         """
@@ -53,7 +58,8 @@ class OpenAIChatSession:
             response = self.openai_client.chat.completions.create(
                 model=self.model_name,
                 messages=openai_messages,
-                temperature=0.7,
+                temperature=self.temperature,
+                top_p=self.top_p
             )
 
             response_text = response.choices[0].message.content.strip()
@@ -126,7 +132,8 @@ class OpenAIClient:
     Compatible with OpenAI, Ollama, llama-server, and other OpenAI-compatible services.
     """
 
-    def __init__(self, model_name: str, api_key: str, base_url: Optional[str] = None):
+    def __init__(self, model_name: str, api_key: str, base_url: Optional[str] = None,
+                 temperature: float = 0.7, top_p: float = 1.0):
         """
         Initialize the OpenAI client with explicit parameters.
 
@@ -134,6 +141,8 @@ class OpenAIClient:
             model_name: Model to use (e.g., 'gpt-4', 'gpt-3.5-turbo', or Ollama model name)
             api_key: OpenAI API key (or dummy key for local services like Ollama)
             base_url: Optional base URL for OpenAI-compatible services (e.g., 'http://localhost:11434/v1' for Ollama)
+            temperature: Controls randomness (0.0-2.0)
+            top_p: Nucleus sampling parameter (0.0-1.0)
 
         Raises:
             ValueError: If api_key is empty or None
@@ -144,6 +153,8 @@ class OpenAIClient:
         self.model_name = model_name
         self.api_key = api_key
         self.base_url = base_url
+        self.temperature = temperature
+        self.top_p = top_p
 
         # Initialize the client during construction
         self._client = self._initialize_client()
@@ -175,7 +186,9 @@ class OpenAIClient:
         config = OpenAIConfig(
             model_name=os.getenv('OPENAI_MODEL_NAME', 'gpt-3.5-turbo'),
             openai_api_key=os.getenv('OPENAI_API_KEY', ''),
-            openai_base_url=os.getenv('OPENAI_BASE_URL')
+            openai_base_url=os.getenv('OPENAI_BASE_URL'),
+            temperature=float(os.getenv('TEMPERATURE', 0.7)),
+            top_p=float(os.getenv('TOP_P', 1.0))
         )
 
         if config.openai_base_url:
@@ -184,7 +197,9 @@ class OpenAIClient:
         return cls(
             model_name=config.model_name,
             api_key=config.openai_api_key,
-            base_url=config.openai_base_url
+            base_url=config.openai_base_url,
+            temperature=config.temperature,
+            top_p=config.top_p
         )
 
     def _initialize_client(self) -> OpenAI:
@@ -230,7 +245,9 @@ class OpenAIClient:
             openai_client=self._client,
             model_name=self.model_name,
             system_instruction=system_instruction,
-            history=history or []
+            history=history or [],
+            temperature=self.temperature,
+            top_p=self.top_p
         )
 
     def count_history_tokens(self, history: List[Dict]) -> int:
