@@ -1,5 +1,6 @@
 """TTS Service for managing text-to-speech model lifecycle."""
 
+import warnings
 from cli import console
 
 
@@ -53,6 +54,10 @@ class TTSService:
         self._device = self._detect_device()
 
         try:
+            # Suppress torchaudio deprecation warnings
+            warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio._backend.utils")
+            warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio._backend.ffmpeg")
+
             from TTS.api import TTS
 
             console.print_info("📥 Ładowanie modelu XTTS v2 (to może potrwać 10-30 sekund przy pierwszym uruchomieniu)...")
