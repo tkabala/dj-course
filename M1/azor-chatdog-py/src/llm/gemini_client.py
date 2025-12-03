@@ -12,6 +12,60 @@ from dotenv import load_dotenv
 from cli import console
 from .gemini_validation import GeminiConfig
 
+class GeminiResponseWrapper:
+    """
+    Wrapper for Gemini response that provides tool call detection.
+    """
+
+    def __init__(self, gemini_response):
+        """
+        Initialize wrapper with Gemini response.
+
+        Args:
+            gemini_response: The actual Gemini response object
+        """
+        self.raw_response = gemini_response
+        # First extract tool calls to check if there are any
+        self.tool_calls = self._extract_tool_calls()
+        # Only try to get text if there are NO tool calls (avoids warning)
+        if len(self.tool_calls) == 0:
+            self.text = gemini_response.text if hasattr(gemini_response, 'text') else None
+        else:
+            self.text = None  # No text when tool call is present
+
+    def _extract_tool_calls(self) -> List[Dict]:
+        """
+        Extract tool calls from Gemini response.
+
+        Returns:
+            List of tool call dictionaries
+        """
+        tool_calls = []
+
+        # Check if response has candidates with function calls
+        if hasattr(self.raw_response, 'candidates') and self.raw_response.candidates:
+            for candidate in self.raw_response.candidates:
+                if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                    for part in candidate.content.parts:
+                        if hasattr(part, 'function_call') and part.function_call:
+                            fc = part.function_call
+                            tool_calls.append({
+                                "name": fc.name,
+                                "arguments": dict(fc.args) if hasattr(fc, 'args') else {}
+                            })
+
+        return tool_calls
+
+    def has_tool_calls(self) -> bool:
+        """
+        Check if response contains tool calls.
+
+        Returns:
+            True if tool calls present, False otherwise
+        """
+        return len(self.tool_calls) > 0
+
+
 class GeminiChatSessionWrapper:
     """
     Wrapper for Gemini chat session that provides universal dictionary-based history format.
@@ -30,14 +84,17 @@ class GeminiChatSessionWrapper:
     def send_message(self, text: str) -> Any:
         """
         Forwards message to Gemini session.
-        
+
         Args:
             text: User's message
-            
+
         Returns:
-            Response object from Gemini
+            Response object from Gemini with tool call handling
         """
-        return self.gemini_session.send_message(text)
+        response = self.gemini_session.send_message(text)
+
+        # Wrap response to add tool call detection
+        return GeminiResponseWrapper(response)
     
     def get_history(self) -> List[Dict]:
         """
@@ -156,18 +213,20 @@ class GeminiLLMClient:
             console.print_error(f"Błąd inicjalizacji klienta Gemini: {e}")
             sys.exit(1)
     
-    def create_chat_session(self, 
-                          system_instruction: str, 
+    def create_chat_session(self,
+                          system_instruction: str,
                           history: Optional[List[Dict]] = None,
-                          thinking_budget: int = 0) -> GeminiChatSessionWrapper:
+                          thinking_budget: int = 0,
+                          tools: Optional[List] = None) -> GeminiChatSessionWrapper:
         """
         Creates a new chat session with the specified configuration.
-        
+
         Args:
             system_instruction: System role/prompt for the assistant
             history: Previous conversation history (optional, in universal dict format)
             thinking_budget: Thinking budget for the model
-            
+            tools: Optional list of ToolDefinition objects for function calling
+
         Returns:
             GeminiChatSessionWrapper with universal dictionary-based interface
         """
@@ -186,17 +245,29 @@ class GeminiLLMClient:
                             parts=[types.Part.from_text(text=text)]
                         )
                         gemini_history.append(content)
-        
+
+        # Convert tools to Gemini format if provided
+        gemini_tools = None
+        if tools:
+            gemini_tools = [tool.to_gemini_tool() for tool in tools]
+
+        # Build config parameters
+        config_params = {
+            "system_instruction": system_instruction,
+            "thinking_config": types.ThinkingConfig(thinking_budget=thinking_budget),
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "top_k": self.top_k
+        }
+
+        # Add tools if provided
+        if gemini_tools:
+            config_params["tools"] = gemini_tools
+
         gemini_session = self._client.chats.create(
             model=self.model_name,
             history=gemini_history,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                thinking_config=types.ThinkingConfig(thinking_budget=thinking_budget),
-                temperature=self.temperature,
-                top_p=self.top_p,
-                top_k=self.top_k
-            )
+            config=types.GenerateContentConfig(**config_params)
         )
         
         return GeminiChatSessionWrapper(gemini_session)

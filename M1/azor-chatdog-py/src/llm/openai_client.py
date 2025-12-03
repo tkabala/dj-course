@@ -17,7 +17,7 @@ class OpenAIChatSession:
     """
 
     def __init__(self, openai_client: OpenAI, model_name: str, system_instruction: str, history: Optional[List[Dict]] = None,
-                 temperature: float = 0.7, top_p: float = 1.0):
+                 temperature: float = 0.7, top_p: float = 1.0, tools: Optional[List] = None):
         """
         Initialize the OpenAI chat session.
 
@@ -28,6 +28,7 @@ class OpenAIChatSession:
             history: Previous conversation history in universal format
             temperature: Controls randomness (0.0-2.0)
             top_p: Nucleus sampling parameter (0.0-1.0)
+            tools: Optional list of ToolDefinition objects for function calling
         """
         self.openai_client = openai_client
         self.model_name = model_name
@@ -35,6 +36,7 @@ class OpenAIChatSession:
         self._history = history or []
         self.temperature = temperature
         self.top_p = top_p
+        self.tools = tools
 
     def send_message(self, text: str) -> Any:
         """
@@ -44,7 +46,7 @@ class OpenAIChatSession:
             text: User's message
 
         Returns:
-            Response object with .text attribute containing the response
+            Response object with .text attribute or tool calls
         """
         # Add user message to history (universal format)
         user_message = {"role": "user", "parts": [{"text": text}]}
@@ -54,22 +56,45 @@ class OpenAIChatSession:
         openai_messages = self._build_openai_messages()
 
         try:
+            # Build API parameters
+            api_params = {
+                "model": self.model_name,
+                "messages": openai_messages,
+                "temperature": self.temperature,
+                "top_p": self.top_p
+            }
+
+            # Add tools if provided
+            if self.tools:
+                api_params["tools"] = [tool.to_openai_function() for tool in self.tools]
+
             # Generate response using OpenAI
-            response = self.openai_client.chat.completions.create(
-                model=self.model_name,
-                messages=openai_messages,
-                temperature=self.temperature,
-                top_p=self.top_p
-            )
+            response = self.openai_client.chat.completions.create(**api_params)
 
-            response_text = response.choices[0].message.content.strip()
+            # Check for tool calls
+            if response.choices[0].message.tool_calls:
+                # Extract tool calls and return special response
+                import json
+                tool_calls = []
+                for tc in response.choices[0].message.tool_calls:
+                    tool_calls.append({
+                        "id": tc.id,
+                        "name": tc.function.name,
+                        "arguments": json.loads(tc.function.arguments)
+                    })
 
-            # Add assistant response to history (universal format)
-            assistant_message = {"role": "model", "parts": [{"text": response_text}]}
-            self._history.append(assistant_message)
+                # Return response with tool calls
+                return OpenAIResponseWithToolCalls(tool_calls)
+            else:
+                # Normal text response
+                response_text = response.choices[0].message.content.strip()
 
-            # Return response object compatible with Gemini interface
-            return OpenAIResponse(response_text)
+                # Add assistant response to history (universal format)
+                assistant_message = {"role": "model", "parts": [{"text": response_text}]}
+                self._history.append(assistant_message)
+
+                # Return response object compatible with Gemini interface
+                return OpenAIResponse(response_text)
 
         except Exception as e:
             console.print_error(f"Błąd podczas generowania odpowiedzi OpenAI: {e}")
@@ -123,6 +148,31 @@ class OpenAIResponse:
 
     def __init__(self, text: str):
         self.text = text
+
+
+class OpenAIResponseWithToolCalls:
+    """
+    Response wrapper for tool calls from OpenAI.
+    """
+
+    def __init__(self, tool_calls: List[Dict]):
+        """
+        Initialize with tool calls.
+
+        Args:
+            tool_calls: List of tool call dictionaries
+        """
+        self.text = None  # No text when tool call
+        self.tool_calls = tool_calls
+
+    def has_tool_calls(self) -> bool:
+        """
+        Check if response contains tool calls.
+
+        Returns:
+            True if tool calls present, False otherwise
+        """
+        return len(self.tool_calls) > 0
 
 
 class OpenAIClient:
@@ -226,7 +276,8 @@ class OpenAIClient:
     def create_chat_session(self,
                           system_instruction: str,
                           history: Optional[List[Dict]] = None,
-                          thinking_budget: int = 0) -> OpenAIChatSession:
+                          thinking_budget: int = 0,
+                          tools: Optional[List] = None) -> OpenAIChatSession:
         """
         Creates a new chat session with the specified configuration.
 
@@ -234,6 +285,7 @@ class OpenAIClient:
             system_instruction: System role/prompt for the assistant
             history: Previous conversation history (optional, in universal dict format)
             thinking_budget: Ignored for OpenAI (compatibility parameter)
+            tools: Optional list of ToolDefinition objects for function calling
 
         Returns:
             OpenAIChatSession object
@@ -247,7 +299,8 @@ class OpenAIClient:
             system_instruction=system_instruction,
             history=history or [],
             temperature=self.temperature,
-            top_p=self.top_p
+            top_p=self.top_p,
+            tools=tools
         )
 
     def count_history_tokens(self, history: List[Dict]) -> int:

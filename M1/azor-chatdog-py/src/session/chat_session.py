@@ -25,18 +25,20 @@ class ChatSession:
     Encapsulates session ID, conversation history, assistant, and LLM chat session.
     """
     
-    def __init__(self, assistant: Assistant, session_id: str | None = None, history: List[Any] | None = None):
+    def __init__(self, assistant: Assistant, session_id: str | None = None, history: List[Any] | None = None, title: str | None = None):
         """
         Initialize a chat session.
-        
+
         Args:
             assistant: Assistant instance that defines the behavior and model for this session
             session_id: Unique session identifier. If None, generates a new UUID.
             history: Initial conversation history. If None, starts empty.
+            title: Optional title for the session thread.
         """
         self.assistant = assistant
         self.session_id = session_id or str(uuid.uuid4())
         self._history = history or []
+        self._title = title
         self._llm_client: Union[GeminiLLMClient, LlamaClient, OpenAIClient, None] = None
         self._llm_chat_session = None
         self._max_context_tokens = 32768
@@ -71,60 +73,110 @@ class ChatSession:
     def load_from_file(cls, assistant: Assistant, session_id: str) -> tuple['ChatSession | None', str | None]:
         """
         Loads a session from disk.
-        
+
         Args:
             assistant: Assistant instance to use for this session
             session_id: ID of the session to load
-            
+
         Returns:
             tuple: (ChatSession object or None, error_message or None)
         """
-        history, error = session_files.load_session_history(session_id)
-        
+        history, title, error = session_files.load_session_history(session_id)
+
         if error:
             return None, error
-        
-        session = cls(assistant=assistant, session_id=session_id, history=history)
+
+        session = cls(assistant=assistant, session_id=session_id, history=history, title=title)
         return session, None
     
     def save_to_file(self) -> tuple[bool, str | None]:
         """
         Saves this session to disk.
         Only saves if history has at least one complete exchange.
-        
+
         Returns:
             tuple: (success: bool, error_message: str | None)
         """
         # Sync history from LLM session before saving
         if self._llm_chat_session:
             self._history = self._llm_chat_session.get_history()
-        
+
         return session_files.save_session_history(
-            self.session_id, 
-            self._history, 
-            self.assistant.system_prompt, 
-            self._llm_client.get_model_name()
+            self.session_id,
+            self._history,
+            self.assistant.system_prompt,
+            self._llm_client.get_model_name(),
+            self._title
         )
     
     def send_message(self, text: str):
         """
         Sends a message to the LLM and returns the response.
         Updates internal history automatically and logs to WAL.
-        
+        Handles tool calls if the LLM requests them.
+
         Args:
             text: User's message
-            
+
         Returns:
-            Response object from Google GenAI
+            Response object from LLM
         """
         if not self._llm_chat_session:
             raise RuntimeError("LLM session not initialized")
-        
+
+        # Import tools
+        from llm.tools import should_offer_title_tool, ToolExecutor, SET_THREAD_TITLE_TOOL
+
+        # Check if we should offer title tool (only on first message without title)
+        offer_tools = should_offer_title_tool(self)
+
+        # Recreate session with tools if needed
+        if offer_tools:
+            console.print_info(f"🔧 Oferuję modelowi tool do tytułowania wątku...")
+            self._llm_chat_session = self._llm_client.create_chat_session(
+                system_instruction=self.assistant.system_prompt,
+                history=self._history,
+                thinking_budget=0,
+                tools=[SET_THREAD_TITLE_TOOL]
+            )
+
+        # Send message
         response = self._llm_chat_session.send_message(text)
-        
-        # Sync history after message
+
+        # Handle tool calls
+        if hasattr(response, 'has_tool_calls') and response.has_tool_calls():
+            console.print_info(f"📞 Model wywołał {len(response.tool_calls)} tool(s):")
+            tool_executor = ToolExecutor(self)
+
+            for tool_call in response.tool_calls:
+                tool_name = tool_call['name']
+                tool_args = tool_call['arguments']
+
+                console.print_info(f"  - Tool: {tool_name}")
+                console.print_info(f"  - Argumenty: {tool_args}")
+
+                # Execute tool (sets title and saves)
+                result = tool_executor.execute_tool(tool_name, tool_args)
+
+                if result['success']:
+                    console.print_info(f"  ✓ {result['message']}")
+                else:
+                    console.print_error(f"  ✗ {result['message']}")
+
+            # After tool execution, resend message without tools to get actual response
+            console.print_info(f"🔄 Ponownie wysyłam wiadomość bez tools aby uzyskać odpowiedź...")
+            self._history = self._llm_chat_session.get_history()
+            self._llm_chat_session = self._llm_client.create_chat_session(
+                system_instruction=self.assistant.system_prompt,
+                history=self._history,
+                thinking_budget=0,
+                tools=None
+            )
+            response = self._llm_chat_session.send_message(text)
+
+        # Sync history
         self._history = self._llm_chat_session.get_history()
-        
+
         # Log to WAL
         total_tokens = self.count_tokens()
         success, error = append_to_wal(
@@ -134,12 +186,12 @@ class ChatSession:
             total_tokens=total_tokens,
             model_name=self._llm_client.get_model_name()
         )
-        
+
         if not success and error:
             # We don't want to fail the entire message sending because of WAL issues
             # Just log the error to stderr or similar - but for now we'll silently continue
             pass
-        
+
         return response
     
     def get_history(self) -> List[Any]:
@@ -223,8 +275,42 @@ class ChatSession:
     def assistant_name(self) -> str:
         """
         Gets the display name of the assistant.
-        
+
         Returns:
             str: The assistant's display name
         """
         return self.assistant.name
+
+    @property
+    def title(self) -> str | None:
+        """
+        Gets the current thread title.
+
+        Returns:
+            str | None: The session title or None if not set
+        """
+        return self._title
+
+    def set_title(self, title: str) -> bool:
+        """
+        Sets the thread title.
+
+        Args:
+            title: The title to set for this session
+
+        Returns:
+            bool: True if successful, False if title is empty
+        """
+        if not title or not title.strip():
+            return False
+        self._title = title.strip()
+        return True
+
+    def has_title(self) -> bool:
+        """
+        Checks if the session has a title.
+
+        Returns:
+            bool: True if title is set, False otherwise
+        """
+        return self._title is not None and len(self._title) > 0
