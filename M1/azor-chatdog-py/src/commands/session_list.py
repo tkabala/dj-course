@@ -10,7 +10,13 @@ def list_sessions_command():
             if session.get('error'):
                 console.print_error(f"- ID: {session['id']} ({session['error']})")
             else:
-                console.print_help(f"- ID: {session['id']} (Wiadomości: {session['messages_count']}, Ost. aktywność: {session['last_activity']})")
+                # Display title if present
+                title_display = f" - {session['title']}" if session.get('title') else ""
+                console.print_help(
+                    f"- ID: {session['id']}{title_display} "
+                    f"(Wiadomości: {session['messages_count']}, "
+                    f"Ost. aktywność: {session['last_activity']})"
+                )
         console.print_help("------------------------------------")
     else:
         console.print_help("\nBrak zapisanych sesji.")

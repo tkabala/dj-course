@@ -245,7 +245,8 @@ class LlamaClient:
     def create_chat_session(self,
                           system_instruction: str,
                           history: Optional[List[Dict]] = None,
-                          thinking_budget: int = 0) -> LlamaChatSession:
+                          thinking_budget: int = 0,
+                          tools: Optional[List] = None) -> LlamaChatSession:
         """
         Creates a new chat session with the specified configuration.
 
@@ -253,10 +254,12 @@ class LlamaClient:
             system_instruction: System role/prompt for the assistant
             history: Previous conversation history (optional)
             thinking_budget: Ignored for LLaMA (compatibility parameter)
+            tools: Ignored for LLaMA - tool calling not supported (compatibility parameter)
 
         Returns:
             LlamaChatSession object
         """
+        # Tools not supported for LLaMA client - parameter ignored for compatibility
         if not self._llama_model:
             raise RuntimeError("LLaMA model not initialized")
 

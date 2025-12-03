@@ -63,6 +63,8 @@ def display_help(session_id: str):
     print_help("  /exit, /quit      - Zakończenie czatu.")
     print_help("\n  /session list     - Wyświetla listę dostępnych sesji.")
     print_help("  /session display  - Wyświetla całą historię sesji.")
+    print_help("  /session title    - Wyświetla tytuł bieżącej sesji.")
+    print_help("  /session rename <tytuł> - Ustawia/zmienia tytuł sesji.")
     print_help("  /session pop      - Usuwa ostatnią parę wpisów (TY i asystent).")
     print_help("  /session clear    - Czyści historię bieżącej sesji.")
     print_help("  /session new      - Rozpoczyna nową sesję.")
