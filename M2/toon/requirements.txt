@@ -3,3 +3,5 @@ pyyaml
 marimo
 toon_format
 colorama
+rich>=13.7.0
+tiktoken>=0.8.0
