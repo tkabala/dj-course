@@ -122,12 +122,59 @@ def json_to_toon_cli(input_json_path: str, output_toon_path: str) -> bool:
         print(f"Wystąpił nieoczekiwany błąd podczas wywoływania CLI TOON: {e}", file=sys.stderr)
         return False
 
+def json_to_tron_cli(input_json_path: str, output_tron_path: str) -> bool:
+    """
+    Konwertuje plik JSON do TRON za pomocą lokalnego wrappera Node.js.
+
+    Uwaga: Ta funkcja wymaga zainstalowanego Node.js, 'node' w ścieżce systemowej,
+    oraz zainstalowanych zależności Node.js (npm install).
+
+    :param input_json_path: Ścieżka do pliku wejściowego JSON.
+    :param output_tron_path: Ścieżka do pliku wyjściowego .tron.
+    :return: True jeśli konwersja się powiodła, False w przeciwnym razie.
+    """
+    # Polecenie dla naszego własnego wrappera CLI
+    # Użycie node dla lokalnego skryptu
+    wrapper_script = os.path.join(os.path.dirname(__file__), 'tron-cli-wrapper.js')
+
+    command = [
+        'node',
+        wrapper_script,
+        input_json_path,
+        '-o',
+        output_tron_path
+    ]
+
+    try:
+        # Wywołanie komendy systemowej
+        result = subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        print(f"INFO: Successfully created TRON file: '{output_tron_path}'.")
+        # print(f"DEBUG CLI Output:\n{result.stdout.strip()}") # Uncomment for debugging
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Błąd podczas konwersji do TRON (CLI zwróciło błąd):", file=sys.stderr)
+        print(f"  Kod powrotu: {e.returncode}", file=sys.stderr)
+        print(f"  Stderr:\n{e.stderr.strip()}", file=sys.stderr)
+        return False
+    except FileNotFoundError:
+        print("Błąd: Polecenie 'node' nie zostało znalezione.", file=sys.stderr)
+        print("Upewnij się, że masz zainstalowane Node.js i 'node' jest dostępne w PATH.", file=sys.stderr)
+        return False
+    except Exception as e:
+        print(f"Wystąpił nieoczekiwany błąd podczas wywoływania CLI TRON: {e}", file=sys.stderr)
+        return False
+
 # --- Główna logika ---
 
 def process_file(json_file_name: str, base_dir: str) -> None:
     """
-    Przetwarza pojedynczy plik JSON, tworząc pliki YAML, -nows.json i .toon.
-    
+    Przetwarza pojedynczy plik JSON, tworząc pliki YAML, -nows.json, .toon i .tron.
+
     :param json_file_name: Nazwa pliku JSON (np. 'arch.json').
     :param base_dir: Katalog bazowy.
     """
@@ -147,10 +194,12 @@ def process_file(json_file_name: str, base_dir: str) -> None:
     output_yaml_path = os.path.join(base_dir, f"{name_without_ext}.yaml")
     output_nows_path = os.path.join(base_dir, f"{name_without_ext}-nows.json")
     output_toon_path = os.path.join(base_dir, f"{name_without_ext}.toon")
+    output_tron_path = os.path.join(base_dir, f"{name_without_ext}.tron")
 
     json_to_yaml(data, output_yaml_path, input_path)
     json_to_nows_json(data, output_nows_path)
     json_to_toon_cli(input_path, output_toon_path)
+    json_to_tron_cli(input_path, output_tron_path)
 
 if __name__ == "__main__":
     BASE_DIR = 'samples/'

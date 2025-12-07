@@ -1,0 +1,10 @@
+{
+  "name": "toon-converters",
+  "version": "1.0.0",
+  "description": "TOON and TRON format converters for gen-from-json.py",
+  "type": "module",
+  "dependencies": {
+    "@tron-format/tron": "^0.1.3"
+  },
+  "private": true
+}
