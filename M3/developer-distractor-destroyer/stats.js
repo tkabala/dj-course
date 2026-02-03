@@ -8,6 +8,9 @@ function displayStats() {
     const timeStatsList = document.getElementById('statsList');
     const timeChartCanvas = document.getElementById('timeChart').getContext('2d');
     const clearTimeStatsBtn = document.getElementById('clearTimeStats');
+    const periodSelect = document.getElementById('periodSelect');
+    const exportBtn = document.getElementById('exportData');
+    const importInput = document.getElementById('importFile');
     let timeChart = null;
 
     const gotchaStatsList = document.getElementById('gotchaList');
@@ -24,11 +27,92 @@ function displayStats() {
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
 
+    // Helper function to get today's date key in YYYY-MM-DD format
+    function getTodayKey() {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+
+    // Get date range based on selected period
+    function getDateRange(period) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let startDate = null;
+        const endDate = new Date(today);
+        endDate.setHours(23, 59, 59, 999);
+
+        switch (period) {
+            case 'today':
+                startDate = new Date(today);
+                break;
+            case '7days':
+                startDate = new Date(today);
+                startDate.setDate(startDate.getDate() - 6);
+                break;
+            case '30days':
+                startDate = new Date(today);
+                startDate.setDate(startDate.getDate() - 29);
+                break;
+            case 'all':
+            default:
+                return null; // No filter
+        }
+
+        return { start: startDate, end: endDate };
+    }
+
+    // Format date to YYYY-MM-DD
+    function formatDateKey(date) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    // Check if a date key is within the range
+    function isDateInRange(dateKey, range) {
+        if (!range) return true;
+        const date = new Date(dateKey);
+        return date >= range.start && date <= range.end;
+    }
+
+    // Aggregate data based on period
+    function aggregateData(data, period) {
+        const range = getDateRange(period);
+        const aggregated = {};
+
+        for (const domain in data) {
+            const domainData = data[domain];
+
+            // Handle both old flat structure (number) and new per-day structure (object)
+            if (typeof domainData === 'number') {
+                // Old flat structure - include only if showing all time
+                if (period === 'all') {
+                    aggregated[domain] = domainData;
+                }
+            } else if (typeof domainData === 'object') {
+                // New per-day structure
+                let total = 0;
+                for (const dateKey in domainData) {
+                    if (isDateInRange(dateKey, range)) {
+                        total += domainData[dateKey];
+                    }
+                }
+                if (total > 0) {
+                    aggregated[domain] = total;
+                }
+            }
+        }
+
+        return aggregated;
+    }
+
     function updateStats() {
+        const selectedPeriod = periodSelect.value;
+
         chrome.storage.local.get(['timeData', 'gotchaStats'], (result) => {
             // Time Stats
             timeStatsList.innerHTML = '';
-            const timeData = result.timeData || {};
+            const rawTimeData = result.timeData || {};
+            const timeData = aggregateData(rawTimeData, selectedPeriod);
             const sortedTimeSites = Object.entries(timeData).sort((a, b) => b[1] - a[1]);
     
             if (sortedTimeSites.length === 0) {
@@ -45,7 +129,8 @@ function displayStats() {
 
             // Gotcha Stats
             gotchaStatsList.innerHTML = '';
-            const gotchaData = result.gotchaStats || {};
+            const rawGotchaData = result.gotchaStats || {};
+            const gotchaData = aggregateData(rawGotchaData, selectedPeriod);
             const sortedGotchaSites = Object.entries(gotchaData).sort((a, b) => b[1] - a[1]);
 
             if (sortedGotchaSites.length === 0) {
@@ -291,6 +376,112 @@ function displayStats() {
                 }
                 updateStats();
             });
+        }
+    });
+
+    // Period selector change handler
+    periodSelect.addEventListener('change', () => {
+        // Reset charts to force redraw with new data
+        if (timeChart) {
+            timeChart.destroy();
+            timeChart = null;
+        }
+        if (gotchaChart) {
+            gotchaChart.destroy();
+            gotchaChart = null;
+        }
+        updateStats();
+    });
+
+    // Export data function
+    function exportData() {
+        chrome.storage.local.get(['timeData', 'gotchaStats', 'blockedWebsites', 'isBlocking', 'storageVersion'], (result) => {
+            const exportObj = {
+                timeData: result.timeData || {},
+                gotchaStats: result.gotchaStats || {},
+                blockedWebsites: result.blockedWebsites || [],
+                isBlocking: result.isBlocking !== undefined ? result.isBlocking : true,
+                storageVersion: result.storageVersion || 1,
+                exportDate: new Date().toISOString()
+            };
+
+            const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ddd-backup-${getTodayKey()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    // Import data function
+    function importData(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const importObj = JSON.parse(e.target.result);
+
+                // Validate structure
+                if (typeof importObj !== 'object' || importObj === null) {
+                    alert('Invalid file format: not a valid JSON object.');
+                    return;
+                }
+
+                // Check for required fields
+                if (!importObj.timeData && !importObj.gotchaStats) {
+                    alert('Invalid file format: missing timeData or gotchaStats.');
+                    return;
+                }
+
+                if (!confirm('This will replace all your current data. Are you sure you want to continue?')) {
+                    return;
+                }
+
+                const dataToSet = {
+                    timeData: importObj.timeData || {},
+                    gotchaStats: importObj.gotchaStats || {},
+                    storageVersion: importObj.storageVersion || 1
+                };
+
+                // Only import these if they exist in the file
+                if (importObj.blockedWebsites !== undefined) {
+                    dataToSet.blockedWebsites = importObj.blockedWebsites;
+                }
+                if (importObj.isBlocking !== undefined) {
+                    dataToSet.isBlocking = importObj.isBlocking;
+                }
+
+                chrome.storage.local.set(dataToSet, () => {
+                    // Reset charts and update
+                    if (timeChart) {
+                        timeChart.destroy();
+                        timeChart = null;
+                    }
+                    if (gotchaChart) {
+                        gotchaChart.destroy();
+                        gotchaChart = null;
+                    }
+                    updateStats();
+                    alert('Data imported successfully!');
+                });
+            } catch (error) {
+                alert('Error parsing file: ' + error.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // Export button click handler
+    exportBtn.addEventListener('click', exportData);
+
+    // Import file change handler
+    importInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            importData(e.target.files[0]);
+            e.target.value = ''; // Reset input
         }
     });
 
