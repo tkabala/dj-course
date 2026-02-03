@@ -122,6 +122,56 @@
             opacity: 1;
         }
 
+        .period-selector {
+            margin-bottom: 20px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .period-selector select {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .period-selector select option {
+            background: #667eea;
+            color: white;
+        }
+
+        .data-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        .data-actions button,
+        .data-actions .import-label {
+            padding: 10px 16px;
+            font-size: 14px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .data-actions button:hover,
+        .data-actions .import-label:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .data-actions input[type="file"] {
+            display: none;
+        }
+
         .scrollbar::-webkit-scrollbar {
             width: 8px;
         }
@@ -146,6 +196,14 @@
         <div class="stats-column">
             <h1>📊 Time Statistics</h1>
             <h2>Time spent per domain</h2>
+            <div class="period-selector">
+                <select id="periodSelect">
+                    <option value="today">Today</option>
+                    <option value="7days">Last 7 days</option>
+                    <option value="30days">Last 30 days</option>
+                    <option value="all" selected>All time</option>
+                </select>
+            </div>
             <div class="chart-container">
                 <canvas id="timeChart"></canvas>
             </div>
@@ -164,6 +222,13 @@
             <div id="gotchaList" class="stats-list scrollbar"></div>
             <div id="clearGotchaStats" class="clear-btn">
                 ❌ Clear "Gotcha" Statistics
+            </div>
+            <div class="data-actions">
+                <button id="exportData">Export JSON</button>
+                <label class="import-label">
+                    Import JSON
+                    <input type="file" id="importFile" accept=".json">
+                </label>
             </div>
         </div>
     </div>

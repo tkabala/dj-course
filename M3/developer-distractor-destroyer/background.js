@@ -7,6 +7,25 @@ let isActive = false;
 // let isBlocking = true;
 // let blockedWebsites = [];
 
+// Helper function to get today's date key in YYYY-MM-DD format
+function getTodayKey() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+// Helper function to increment gotcha stats for a domain
+function incrementGotchaStats(domain) {
+    const todayKey = getTodayKey();
+    chrome.storage.local.get('gotchaStats', (result) => {
+        const stats = result.gotchaStats || {};
+        if (!stats[domain]) {
+            stats[domain] = {};
+        }
+        stats[domain][todayKey] = (stats[domain][todayKey] || 0) + 1;
+        chrome.storage.local.set({ gotchaStats: stats });
+    });
+}
+
 // Initialize when extension starts
 chrome.runtime.onStartup.addListener(initializeExtension);
 chrome.runtime.onInstalled.addListener(initializeExtension);
@@ -16,17 +35,50 @@ function initializeExtension() {
     loadSettingsFromStorage();
     console.log('initialize')
 
-    // Initialize storage
-    chrome.storage.local.get(['timeData', 'currentSessionTime', 'gotchaStats'], function(result) {
-        if (!result.timeData) {
-            chrome.storage.local.set({timeData: {}});
+    // Initialize storage and migrate if needed
+    chrome.storage.local.get(['timeData', 'currentSessionTime', 'gotchaStats', 'storageVersion'], function(result) {
+        const todayKey = getTodayKey();
+        let timeData = result.timeData || {};
+        let gotchaStats = result.gotchaStats || {};
+        let needsMigration = false;
+
+        // Check if migration is needed (storageVersion not set means old flat structure)
+        if (result.storageVersion === undefined) {
+            // Migrate timeData: { "domain": 123 } -> { "domain": { "2026-01-23": 123 } }
+            const newTimeData = {};
+            for (const domain in timeData) {
+                if (typeof timeData[domain] === 'number') {
+                    newTimeData[domain] = { [todayKey]: timeData[domain] };
+                    needsMigration = true;
+                } else {
+                    newTimeData[domain] = timeData[domain];
+                }
+            }
+            timeData = newTimeData;
+
+            // Migrate gotchaStats: { "domain": 5 } -> { "domain": { "2026-01-23": 5 } }
+            const newGotchaStats = {};
+            for (const domain in gotchaStats) {
+                if (typeof gotchaStats[domain] === 'number') {
+                    newGotchaStats[domain] = { [todayKey]: gotchaStats[domain] };
+                    needsMigration = true;
+                } else {
+                    newGotchaStats[domain] = gotchaStats[domain];
+                }
+            }
+            gotchaStats = newGotchaStats;
+
+            if (needsMigration) {
+                console.log('Migrating storage to per-day structure');
+            }
         }
-        if (!result.currentSessionTime) {
-            chrome.storage.local.set({currentSessionTime: 0});
-        }
-        if (!result.gotchaStats) {
-            chrome.storage.local.set({gotchaStats: {}});
-        }
+
+        chrome.storage.local.set({
+            timeData: timeData,
+            gotchaStats: gotchaStats,
+            currentSessionTime: result.currentSessionTime || 0,
+            storageVersion: 1
+        });
     });
 
     // Start tracking current tab
@@ -69,11 +121,15 @@ function trackActiveTab() {
 }
 
 function updateTime(domain) {
+    const todayKey = getTodayKey();
     chrome.storage.local.get(['timeData', 'currentSessionTime'], (result) => {
         const timeData = result.timeData || {};
         const currentSessionTime = result.currentSessionTime || 0;
 
-        timeData[domain] = (timeData[domain] || 0) + 1;
+        if (!timeData[domain]) {
+            timeData[domain] = {};
+        }
+        timeData[domain][todayKey] = (timeData[domain][todayKey] || 0) + 1;
 
         chrome.storage.local.set({
             timeData: timeData,
@@ -145,12 +201,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
         if (isBlocked) {
             chrome.tabs.update(tabId, { url: chrome.runtime.getURL('blocked.html') });
-            
-            chrome.storage.local.get('gotchaStats', (result) => {
-                const stats = result.gotchaStats || {};
-                stats[domain] = (stats[domain] || 0) + 1;
-                chrome.storage.local.set({ gotchaStats: stats });
-            });
+            incrementGotchaStats(domain);
         }
     });
 });
@@ -187,11 +238,7 @@ function monitorIfBlocked() {
 
                 if (isBlocked) {
                     chrome.tabs.update(tab.id, { url: blockedPageUrl });
-                    chrome.storage.local.get('gotchaStats', (result) => {
-                        const stats = result.gotchaStats || {};
-                        stats[domain] = (stats[domain] || 0) + 1;
-                        chrome.storage.local.set({ gotchaStats: stats });
-                    });
+                    incrementGotchaStats(domain);
                 }
             } catch (error) {
                 // Ignore invalid URLs
