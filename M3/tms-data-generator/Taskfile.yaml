@@ -33,6 +33,29 @@ tasks:
     cmds:
       - rm -rf bin output
 
+  db:up:
+    desc: Start the PostgreSQL database and wait until ready
+    cmds:
+      - docker compose up -d
+      - docker compose exec db bash -c "until pg_isready -U postgres; do sleep 1; done"
+
+  db:down:
+    desc: Stop and remove the PostgreSQL database (wipes data)
+    cmds:
+      - docker compose down -v
+
+  db:reset:
+    desc: Regenerate SQL and reload the database from scratch
+    cmds:
+      - task: run
+      - task: db:down
+      - task: db:up
+
+  query:
+    desc: "Run a query file against the TMS database. Usage: task query -- <name>  or  task query PERIOD='[2026-02-21 08:00,2026-02-21 20:00)' -- <name>"
+    cmds:
+      - docker compose exec -T db psql -U postgres -d tms {{if .PERIOD}}-v period="{{.PERIOD}}"{{end}} < queries/{{.CLI_ARGS}}.sql
+
   default:
     desc: Build and run the generator
     cmds:

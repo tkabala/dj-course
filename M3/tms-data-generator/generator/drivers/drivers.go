@@ -19,7 +19,6 @@ func GenerateDrivers(count int) []Driver {
 			Email:        gofakeit.Email(),
 			Phone:        gofakeit.Phone(),
 			ContractType: randomContractType(),
-			Status:       randomDriverStatus(),
 		})
 	}
 	return drivers
@@ -33,7 +32,7 @@ func GenerateInsertStatements(drivers []Driver) string {
 
 	var sb strings.Builder
 	sb.Grow(len(drivers) * 150) // Estimate and pre-allocate memory
-	sb.WriteString("INSERT INTO drivers (id, first_name, last_name, email, phone, contract_type, status) VALUES\n")
+	sb.WriteString("INSERT INTO drivers (id, first_name, last_name, email, phone, contract_type) VALUES\n")
 
 	for i, d := range drivers {
 		sb.WriteString("    (")
@@ -48,8 +47,6 @@ func GenerateInsertStatements(drivers []Driver) string {
 		sb.WriteString(d.Phone)
 		sb.WriteString("', '")
 		sb.WriteString(string(d.ContractType))
-		sb.WriteString("', '")
-		sb.WriteString(string(d.Status))
 		sb.WriteString("')")
 
 		if i < len(drivers)-1 {
@@ -67,7 +64,3 @@ func randomContractType() ContractType {
 	return types[rand.Intn(len(types))]
 }
 
-func randomDriverStatus() DriverStatus {
-	statuses := []DriverStatus{Active, OnRoute, Resting, OffDuty, SickLeave}
-	return statuses[rand.Intn(len(statuses))]
-}

@@ -8,17 +8,6 @@ const (
 	FullTime   ContractType = "FULL_TIME"
 )
 
-// DriverStatus represents the current status of a driver.
-type DriverStatus string
-
-const (
-	Active    DriverStatus = "ACTIVE"
-	OnRoute   DriverStatus = "ON_ROUTE"
-	Resting   DriverStatus = "RESTING"
-	OffDuty   DriverStatus = "OFF_DUTY"
-	SickLeave DriverStatus = "SICK_LEAVE"
-)
-
 // Driver represents a driver entity.
 type Driver struct {
 	ID           int
@@ -27,5 +16,4 @@ type Driver struct {
 	Email        string
 	Phone        string
 	ContractType ContractType
-	Status       DriverStatus
 }
