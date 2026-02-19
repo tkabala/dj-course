@@ -1,9 +1,14 @@
+DROP TABLE IF EXISTS resource_blackouts;
+DROP TABLE IF EXISTS assignments;
+DROP TABLE IF EXISTS driver_shifts;
 DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS order_timeline_events;
 DROP TABLE IF EXISTS transportation_orders;
 DROP TABLE IF EXISTS customers;
 DROP TABLE IF EXISTS drivers;
 DROP TABLE IF EXISTS vehicles;
+
+CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 CREATE TABLE vehicles (
     id INT PRIMARY KEY,
@@ -19,8 +24,7 @@ CREATE TABLE drivers (
     last_name VARCHAR(50),
     email VARCHAR(100),
     phone VARCHAR(20),
-    contract_type VARCHAR(20),
-    status VARCHAR(20)
+    contract_type VARCHAR(20)
 );
 
 CREATE TABLE customers (
@@ -72,7 +76,45 @@ CREATE TABLE order_items (
     FOREIGN KEY (order_id) REFERENCES transportation_orders(id)
 );
 
+CREATE TABLE driver_shifts (
+    id INT PRIMARY KEY,
+    driver_id INT NOT NULL,
+    day_of_week INT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    FOREIGN KEY (driver_id) REFERENCES drivers(id)
+);
+
+CREATE TABLE assignments (
+    id INT PRIMARY KEY,
+    order_id INT NOT NULL,
+    driver_id INT NOT NULL,
+    vehicle_id INT NOT NULL,
+    booking_period TSRANGE NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES transportation_orders(id),
+    FOREIGN KEY (driver_id) REFERENCES drivers(id),
+    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
+    EXCLUDE USING gist (driver_id WITH =, booking_period WITH &&),
+    EXCLUDE USING gist (vehicle_id WITH =, booking_period WITH &&)
+);
+
+CREATE TABLE resource_blackouts (
+    id INT PRIMARY KEY,
+    driver_id INT,
+    vehicle_id INT,
+    blackout_period TSRANGE NOT NULL,
+    reason VARCHAR(100) NOT NULL,
+    FOREIGN KEY (driver_id) REFERENCES drivers(id),
+    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
+);
+
 CREATE INDEX idx_timeline_order ON order_timeline_events(order_id);
 CREATE INDEX idx_items_order ON order_items(order_id);
 CREATE INDEX idx_orders_customer ON transportation_orders(customer_id);
 CREATE INDEX idx_orders_status ON transportation_orders(status);
+CREATE INDEX idx_driver_shifts_driver ON driver_shifts(driver_id);
+CREATE INDEX idx_assignments_order ON assignments(order_id);
+CREATE INDEX idx_assignments_driver ON assignments(driver_id);
+CREATE INDEX idx_assignments_vehicle ON assignments(vehicle_id);
+CREATE INDEX idx_blackouts_driver ON resource_blackouts(driver_id);
+CREATE INDEX idx_blackouts_vehicle ON resource_blackouts(vehicle_id);

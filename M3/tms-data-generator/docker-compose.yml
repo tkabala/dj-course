@@ -1,0 +1,10 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: tms
+    volumes:
+      - ./output/tms-latest.sql:/docker-entrypoint-initdb.d/tms-latest.sql
+    ports:
+      - "5432:5432"

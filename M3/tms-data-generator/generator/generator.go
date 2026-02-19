@@ -9,9 +9,12 @@ import (
 	"sync"
 	"time"
 
+	"tms-data-generator/generator/assignments"
 	"tms-data-generator/generator/config"
 	"tms-data-generator/generator/customers"
+	"tms-data-generator/generator/driver_shifts"
 	"tms-data-generator/generator/drivers"
+	"tms-data-generator/generator/resource_blackouts"
 	"tms-data-generator/generator/transportation_orders"
 	"tms-data-generator/generator/vehicles"
 )
@@ -113,6 +116,40 @@ func Generate(outputFile string) error {
 	itemsStatements := transportation_orders.GenerateOrderItemsInsertStatements(orderItems)
 	fmt.Println("done generating SQL statements", time.Now(), time.Since(startSQL))
 
+	// Phase 7: Generate new domain entities in parallel
+	driversList := drivers.GenerateDrivers(config.DRIVERS)
+	vehiclesList := vehicles.GenerateVehicles(config.VEHICLES)
+
+	// Shifts must be generated before assignments so we can filter on-shift drivers
+	startShifts := time.Now()
+	fmt.Println("Generating driver shifts...", time.Now())
+	shiftsList := driver_shifts.GenerateDriverShifts(config.DRIVER_SHIFTS, driversList)
+	driverShiftsStatements := driver_shifts.GenerateInsertStatements(shiftsList)
+	fmt.Println("done generating driver shifts", time.Now(), time.Since(startShifts))
+
+	startAssignments := time.Now()
+	fmt.Println("Generating assignments...", time.Now())
+	assignmentsList := assignments.GenerateAssignments(config.ASSIGNMENTS, ordersList, driversList, vehiclesList, shiftsList)
+	assignmentsStatements := assignments.GenerateInsertStatements(assignmentsList)
+	fmt.Println("done generating assignments", time.Now(), time.Since(startAssignments))
+
+	// Collect drivers and vehicles with a currently active assignment so blackouts don't overlap them
+	now := time.Now()
+	activeDriverIDs := make(map[int]bool)
+	activeVehicleIDs := make(map[int]bool)
+	for _, a := range assignmentsList {
+		if !a.BookingStart.After(now) && a.BookingEnd.After(now) {
+			activeDriverIDs[a.DriverID] = true
+			activeVehicleIDs[a.VehicleID] = true
+		}
+	}
+
+	startBlackouts := time.Now()
+	fmt.Println("Generating resource blackouts...", time.Now())
+	blackoutsList := resource_blackouts.GenerateResourceBlackouts(config.RESOURCE_BLACKOUTS, driversList, vehiclesList, activeDriverIDs, activeVehicleIDs)
+	blackoutsStatements := resource_blackouts.GenerateInsertStatements(blackoutsList)
+	fmt.Println("done generating resource blackouts", time.Now(), time.Since(startBlackouts))
+
 	elapsed := time.Since(start)
 	fmt.Printf("Time taken to generate all: %s\n", elapsed)
 	fmt.Printf("GOMAXPROCS: %d\n", runtime.GOMAXPROCS(0))
@@ -127,6 +164,9 @@ func Generate(outputFile string) error {
 	sb.WriteString(ordersStatements)
 	sb.WriteString(timelineStatements)
 	sb.WriteString(itemsStatements)
+	sb.WriteString(driverShiftsStatements)
+	sb.WriteString(assignmentsStatements)
+	sb.WriteString(blackoutsStatements)
 
 	err = os.WriteFile(outputFile, []byte(sb.String()), 0644)
 	if err != nil {
