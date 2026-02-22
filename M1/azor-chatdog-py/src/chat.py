@@ -46,7 +46,7 @@ def main_loop():
             total_tokens, remaining_tokens, max_tokens = session.get_token_info()
 
             # Display response
-            console.print_assistant(f"\n{session.assistant_name}: {response.text}")
+            console.print_assistant_response(session.assistant_name, response.text)
             console.print_info(f"Tokens: {total_tokens} (Pozostało: {remaining_tokens} / {max_tokens})")
 
             # Save session

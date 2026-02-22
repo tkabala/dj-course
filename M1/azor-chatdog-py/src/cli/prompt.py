@@ -62,7 +62,7 @@ class SlashCommandLexer(Lexer):
 _prompt_style = Style.from_dict({
     'slash-command': '#ff0066 bold',
     'subcommand': '#00ff00 bold',
-    'normal-text': '#aaaaaa',
+    'normal-text': '#f5d76e bold',
 })
 
 # Nested auto-completion for slash commands with subcommands
