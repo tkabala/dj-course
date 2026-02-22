@@ -1,55 +1,51 @@
 """
 Console output utilities for the chatbot.
-Centralizes colorama usage for consistent terminal output.
+Centralizes colorama/rich usage for consistent terminal output.
 """
 import sys
 from colorama import init, Fore, Style
+from rich.console import Console
+from rich.markdown import Markdown
 from files.config import LOG_DIR
 
 init(autoreset=True)
 
+_rich_console = Console()
+
 
 def print_error(message: str):
-    """Print an error message in red color.
-    
-    Args:
-        message: The error message to display
-    """
+    """Print an error message in red color."""
     print(Fore.RED + message + Style.RESET_ALL)
 
 
 def print_assistant(message: str):
-    """Print an assistant message in cyan color.
-    
-    Args:
-        message: The assistant message to display
-    """
+    """Print an assistant-role message in cyan color (used for session display etc.)."""
     print(Fore.CYAN + message + Style.RESET_ALL)
 
 
-def print_user(message: str):
-    """Print a user message in blue color.
-    
+def print_assistant_response(name: str, response: str):
+    """Print assistant name in bold magenta and render the response as markdown.
+
     Args:
-        message: The user message to display
+        name: The assistant name (e.g. "AZOR")
+        response: The markdown response text
     """
+    _rich_console.print(f"\n[bold magenta]{name}:[/bold magenta]")
+    _rich_console.print(Markdown(response))
+
+
+def print_user(message: str):
+    """Print a user message in blue color."""
     print(Fore.BLUE + message + Style.RESET_ALL)
 
 
 def print_info(message: str):
-    """Print an informational message in yellow color.
-    
-    Args:
-        message: The informational message to display
-    """
+    """Print an informational message."""
     print(message)
 
+
 def print_help(message: str):
-    """Print an informational message in yellow color.
-    
-    Args:
-        message: The informational message to display
-    """
+    """Print a help message in yellow color."""
     print(Fore.YELLOW + message + Style.RESET_ALL)
 
 
@@ -80,4 +76,3 @@ def display_final_instructions(session_id: str):
     print_info(f"Aby kontynuować tę sesję (ID: {session_id}) później, użyj komendy:")
     print(Fore.WHITE + Style.BRIGHT + f"\n    python {sys.argv[0]} --session-id={session_id}\n" + Style.RESET_ALL)
     print("--------------------------------------\n")
-
