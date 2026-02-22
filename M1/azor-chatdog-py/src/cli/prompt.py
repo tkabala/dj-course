@@ -4,7 +4,7 @@ Includes syntax highlighting, auto-completion, and custom key bindings.
 """
 
 from prompt_toolkit import prompt
-from prompt_toolkit.completion import NestedCompleter, WordCompleter
+from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.lexers import Lexer
 from prompt_toolkit.styles import Style
 from prompt_toolkit.key_binding import KeyBindings
@@ -65,17 +65,55 @@ _prompt_style = Style.from_dict({
     'normal-text': '#f5d76e bold',
 })
 
-# Nested auto-completion for slash commands with subcommands
-_commands_completer = NestedCompleter({
-    '/exit': None,
-    '/quit': None,
-    '/help': None,
-    '/switch': None,
-    '/session': WordCompleter(SESSION_SUBCOMMANDS, ignore_case=False),
-    '/pdf': None,
-    '/audio': None,
-    '/audio-all': None
-})
+class SlashCommandCompleter(Completer):
+    """Custom completer that correctly filters slash commands as the user types."""
+
+    def get_completions(self, document, complete_event):
+        text = document.text_before_cursor
+
+        if not text.startswith('/'):
+            return
+
+        parts = text.split()
+        if not parts:
+            return
+
+        first_word = parts[0]
+
+        # Still typing the command name (no space after it yet)
+        if len(parts) == 1 and not text.endswith(' '):
+            for cmd in SLASH_COMMANDS:
+                if cmd.startswith(first_word):
+                    yield Completion(cmd, start_position=-len(first_word))
+
+        # Typing subcommands after /session
+        elif first_word == '/session' and (len(parts) > 1 or text.endswith(' ')):
+            subcmd_prefix = parts[1] if len(parts) > 1 else ''
+            for subcmd in SESSION_SUBCOMMANDS:
+                if subcmd.startswith(subcmd_prefix):
+                    yield Completion(subcmd, start_position=-len(subcmd_prefix))
+
+        # Typing a session ID argument after /switch
+        elif first_word == '/switch':
+            if len(parts) == 1 and text.endswith(' '):
+                fragment = ''
+            elif len(parts) == 2 and not text.endswith(' '):
+                fragment = parts[1]
+            else:
+                return
+
+            from files.session_files import list_sessions
+            for session in list_sessions():
+                session_id = session['id']
+                title = session['title'] or 'Untitled'
+                label = f"{session_id[:8]} {title}"
+
+                if fragment.lower() in label.lower():
+                    yield Completion(
+                        session_id,
+                        start_position=-len(fragment),
+                        display=label,
+                    )
 
 
 def _create_key_bindings():
@@ -90,6 +128,13 @@ def _create_key_bindings():
     def _(event):
         """When completion is selected, accept it (close dropdown)"""
         event.app.current_buffer.complete_state = None
+
+    @kb.add('backspace')
+    def _(event):
+        """Delete one char and restart completion so the dropdown reappears."""
+        buf = event.app.current_buffer
+        buf.delete_before_cursor()
+        buf.start_completion(select_first=False)
 
     return kb
 
@@ -118,7 +163,7 @@ def get_user_input(prompt_text: str = "TY: ") -> str:
     """
     return prompt(
         prompt_text,
-        completer=_commands_completer,
+        completer=SlashCommandCompleter(),
         lexer=SlashCommandLexer(),
         style=_prompt_style,
         complete_while_typing=True,
