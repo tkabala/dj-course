@@ -95,6 +95,26 @@ class GeminiChatSessionWrapper:
 
         # Wrap response to add tool call detection
         return GeminiResponseWrapper(response)
+
+    def send_tool_results(self, tool_results: list) -> Any:
+        """
+        Send function response parts back to the model after tool execution.
+
+        Args:
+            tool_results: list of {"name": str, "result": dict}
+
+        Returns:
+            Response object from Gemini
+        """
+        parts = []
+        for tr in tool_results:
+            result_content = tr["result"].get("message", str(tr["result"]))
+            parts.append(types.Part.from_function_response(
+                name=tr["name"],
+                response={"output": result_content}
+            ))
+        response = self.gemini_session.send_message(parts)
+        return GeminiResponseWrapper(response)
     
     def get_history(self) -> List[Dict]:
         """

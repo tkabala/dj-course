@@ -85,7 +85,23 @@ class LlamaChatSession:
     def get_history(self) -> List[Dict]:
         """Returns the current conversation history."""
         return self._history
-    
+
+    def send_tool_results(self, tool_results: list) -> Any:
+        """
+        LLaMA doesn't support native tool calling, so inject results as plain text context.
+
+        Args:
+            tool_results: list of {"id": str, "name": str, "result": dict}
+
+        Returns:
+            Response object with .text attribute
+        """
+        results_text = "\n".join(
+            f"[Tool '{tr['name']}' returned]: {tr['result'].get('message', str(tr['result']))}"
+            for tr in tool_results
+        )
+        return self.send_message(f"[Wyniki narzędzi]\n{results_text}")
+
     def _build_prompt_from_history(self) -> str:
         """
         Builds a prompt string from the conversation history and system instruction.

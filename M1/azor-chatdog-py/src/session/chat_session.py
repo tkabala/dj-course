@@ -42,7 +42,10 @@ class ChatSession:
         self._llm_client: Union[GeminiLLMClient, LlamaClient, OpenAIClient, None] = None
         self._llm_chat_session = None
         self._max_context_tokens = 32768
+        self._mcp_manager = None
+        self._mcp_tools: List[Any] = []
         self._initialize_llm_session()
+        self._initialize_mcp()
     
     def _initialize_llm_session(self):
         """
@@ -69,6 +72,25 @@ class ChatSession:
         )
     
     
+    def _initialize_mcp(self):
+        """
+        Initialise the MCP client manager if mcp_servers.json exists and is non-empty.
+        Fetches tool list once and caches it for the session lifetime.
+        """
+        from azor_mcp.client import MCPClientManager, MCP_CONFIG_PATH
+        import os
+        if not os.path.exists(MCP_CONFIG_PATH):
+            return
+        try:
+            manager = MCPClientManager()
+            if not manager.has_servers():
+                return
+            self._mcp_manager = manager
+            self._mcp_tools = manager.get_all_tools()
+            console.print_info(f"🔌 MCP: załadowano {len(self._mcp_tools)} tool(s) z {len(manager._server_configs)} serwera(ów)")
+        except Exception as e:
+            console.print_info(f"⚠️  MCP: nie udało się zainicjować klienta: {e}")
+
     @classmethod
     def load_from_file(cls, assistant: Assistant, session_id: str) -> tuple['ChatSession | None', str | None]:
         """
@@ -127,52 +149,76 @@ class ChatSession:
         # Import tools
         from llm.tools import should_offer_title_tool, ToolExecutor, SET_THREAD_TITLE_TOOL
 
-        # Check if we should offer title tool (only on first message without title)
-        offer_tools = should_offer_title_tool(self)
+        # Build tool list: title tool (when needed) + MCP tools
+        active_tools = []
+        if should_offer_title_tool(self):
+            active_tools.append(SET_THREAD_TITLE_TOOL)
+        active_tools.extend(self._mcp_tools)
 
-        # Recreate session with tools if needed
-        if offer_tools:
-            console.print_info(f"🔧 Oferuję modelowi tool do tytułowania wątku...")
+        # Recreate session with tools if any are active
+        if active_tools:
+            if should_offer_title_tool(self):
+                console.print_info(f"🔧 Oferuję modelowi tool do tytułowania wątku...")
+            if self._mcp_tools:
+                console.print_info(f"🔌 Oferuję modelowi {len(self._mcp_tools)} MCP tool(s)...")
             self._llm_chat_session = self._llm_client.create_chat_session(
                 system_instruction=self.assistant.system_prompt,
                 history=self._history,
                 thinking_budget=0,
-                tools=[SET_THREAD_TITLE_TOOL]
+                tools=active_tools
             )
 
         # Send message
         response = self._llm_chat_session.send_message(text)
 
-        # Handle tool calls
-        if hasattr(response, 'has_tool_calls') and response.has_tool_calls():
+        # Handle tool calls (loop to support multi-turn: model may call tools multiple times)
+        tool_executor = ToolExecutor(self, mcp_manager=self._mcp_manager)
+        while hasattr(response, 'has_tool_calls') and response.has_tool_calls():
             console.print_info(f"📞 Model wywołał {len(response.tool_calls)} tool(s):")
-            tool_executor = ToolExecutor(self)
+
+            has_mcp_calls = any(tc['name'].startswith('mcp__') for tc in response.tool_calls)
+            mcp_results_for_model = []  # Collected for proper tool-result protocol
 
             for tool_call in response.tool_calls:
                 tool_name = tool_call['name']
                 tool_args = tool_call['arguments']
+                tool_id = tool_call.get('id')
 
-                console.print_info(f"  - Tool: {tool_name}")
-                console.print_info(f"  - Argumenty: {tool_args}")
+                console.print_info(f"  - Tool: {tool_name} | Argumenty: {tool_args}")
 
-                # Execute tool (sets title and saves)
                 result = tool_executor.execute_tool(tool_name, tool_args)
 
                 if result['success']:
-                    console.print_info(f"  ✓ {result['message']}")
+                    msg_lines = str(result['message']).splitlines()
+                    truncated = "\n    ".join(msg_lines[:3])
+                    suffix = " ..." if len(msg_lines) > 3 else ""
+                    console.print_info(f"  ✓ {truncated}{suffix}")
                 else:
                     console.print_error(f"  ✗ {result['message']}")
 
-            # After tool execution, resend message without tools to get actual response
-            console.print_info(f"🔄 Ponownie wysyłam wiadomość bez tools aby uzyskać odpowiedź...")
-            self._history = self._llm_chat_session.get_history()
-            self._llm_chat_session = self._llm_client.create_chat_session(
-                system_instruction=self.assistant.system_prompt,
-                history=self._history,
-                thinking_budget=0,
-                tools=None
-            )
-            response = self._llm_chat_session.send_message(text)
+                if tool_name.startswith('mcp__'):
+                    mcp_results_for_model.append({
+                        "id": tool_id,
+                        "name": tool_name,
+                        "result": result
+                    })
+
+            if has_mcp_calls:
+                # Proper tool-result protocol: send results back, model may call more tools
+                console.print_info(f"🔄 Odsyłam wyniki MCP do modelu...")
+                response = self._llm_chat_session.send_tool_results(mcp_results_for_model)
+            else:
+                # Fire-and-forget (e.g. set_thread_title): resend original message without tools
+                console.print_info(f"🔄 Ponownie wysyłam wiadomość bez tools aby uzyskać odpowiedź...")
+                self._history = self._llm_chat_session.get_history()
+                self._llm_chat_session = self._llm_client.create_chat_session(
+                    system_instruction=self.assistant.system_prompt,
+                    history=self._history,
+                    thinking_budget=0,
+                    tools=None
+                )
+                response = self._llm_chat_session.send_message(text)
+                break  # After fire-and-forget, the response will not have tool calls
 
         # Sync history
         self._history = self._llm_chat_session.get_history()
