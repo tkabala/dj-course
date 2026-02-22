@@ -79,16 +79,19 @@ class ToolExecutor:
 
     Attributes:
         chat_session: ChatSession instance that tools can modify
+        mcp_manager: Optional MCPClientManager for routing MCP tool calls
     """
 
-    def __init__(self, chat_session):
+    def __init__(self, chat_session, mcp_manager=None):
         """
         Initialize tool executor with a chat session.
 
         Args:
             chat_session: ChatSession instance that tools can modify
+            mcp_manager: Optional MCPClientManager instance
         """
         self.chat_session = chat_session
+        self.mcp_manager = mcp_manager
         self._tool_handlers: Dict[str, Callable] = {
             'set_thread_title': self._handle_set_thread_title
         }
@@ -97,6 +100,9 @@ class ToolExecutor:
         """
         Executes a tool by name with given arguments.
 
+        Tool names prefixed with 'mcp__' are routed to the MCP client manager.
+        Format: mcp__{server_name}__{tool_name}
+
         Args:
             tool_name: Name of the tool to execute
             arguments: Dictionary of arguments for the tool
@@ -104,6 +110,9 @@ class ToolExecutor:
         Returns:
             Dictionary with execution result: {"success": bool, "message": str, "data": Any}
         """
+        if tool_name.startswith("mcp__"):
+            return self._handle_mcp_tool(tool_name, arguments)
+
         handler = self._tool_handlers.get(tool_name)
         if not handler:
             return {
@@ -118,6 +127,48 @@ class ToolExecutor:
             return {
                 "success": False,
                 "message": f"Tool execution error: {str(e)}",
+                "data": None
+            }
+
+    def _handle_mcp_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Routes an MCP tool call to the MCPClientManager.
+
+        Args:
+            tool_name: Namespaced tool name: mcp__{server_name}__{bare_tool_name}
+            arguments: Tool arguments
+
+        Returns:
+            Execution result dictionary
+        """
+        if self.mcp_manager is None:
+            return {
+                "success": False,
+                "message": "MCP manager not available",
+                "data": None
+            }
+
+        # Parse server_name and bare tool_name from the namespaced name
+        parts = tool_name.split("__", 2)  # ["mcp", server_name, tool_name]
+        if len(parts) != 3:
+            return {
+                "success": False,
+                "message": f"Invalid MCP tool name format: {tool_name}",
+                "data": None
+            }
+        _, server_name, bare_tool_name = parts
+
+        try:
+            result = self.mcp_manager.call_tool(server_name, bare_tool_name, arguments)
+            return {
+                "success": True,
+                "message": result.get("content", str(result)),
+                "data": result
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"MCP tool execution error: {str(e)}",
                 "data": None
             }
 

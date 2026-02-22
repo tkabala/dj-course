@@ -37,6 +37,7 @@ class OpenAIChatSession:
         self.temperature = temperature
         self.top_p = top_p
         self.tools = tools
+        self._pending_tool_calls = None  # Raw OpenAI tool_calls for proper result flow
 
     def send_message(self, text: str) -> Any:
         """
@@ -73,6 +74,9 @@ class OpenAIChatSession:
 
             # Check for tool calls
             if response.choices[0].message.tool_calls:
+                # Save raw tool_calls for the tool-result follow-up
+                self._pending_tool_calls = response.choices[0].message.tool_calls
+
                 # Extract tool calls and return special response
                 import json
                 tool_calls = []
@@ -107,6 +111,61 @@ class OpenAIChatSession:
     def get_history(self) -> List[Dict]:
         """Returns the current conversation history in universal format."""
         return self._history
+
+    def send_tool_results(self, tool_results: list) -> Any:
+        """
+        Feed tool results back to the model using the proper OpenAI tool protocol.
+
+        Args:
+            tool_results: list of {"id": str, "name": str, "result": dict}
+
+        Returns:
+            Response object with .text attribute
+        """
+        messages = self._build_openai_messages()
+
+        # Re-add the assistant's tool_call message that wasn't stored in _history
+        if self._pending_tool_calls:
+            messages.append({
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments
+                        }
+                    }
+                    for tc in self._pending_tool_calls
+                ]
+            })
+
+        # Add tool result messages
+        for tr in tool_results:
+            content = tr["result"].get("message", str(tr["result"]))
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tr["id"],
+                "content": content
+            })
+
+        try:
+            response = self.openai_client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                temperature=self.temperature,
+                top_p=self.top_p
+            )
+            response_text = response.choices[0].message.content.strip()
+        except Exception as e:
+            console.print_error(f"Błąd podczas generowania odpowiedzi po tool call: {e}")
+            response_text = "Przepraszam, wystąpił błąd podczas generowania odpowiedzi."
+
+        self._history.append({"role": "model", "parts": [{"text": response_text}]})
+        self._pending_tool_calls = None
+        return OpenAIResponse(response_text)
 
     def _build_openai_messages(self) -> List[Dict[str, str]]:
         """
