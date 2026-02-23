@@ -45,7 +45,7 @@ class GeminiResponseWrapper:
         # Check if response has candidates with function calls
         if hasattr(self.raw_response, 'candidates') and self.raw_response.candidates:
             for candidate in self.raw_response.candidates:
-                if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts') and candidate.content.parts:
                     for part in candidate.content.parts:
                         if hasattr(part, 'function_call') and part.function_call:
                             fc = part.function_call

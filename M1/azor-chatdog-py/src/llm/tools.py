@@ -73,6 +73,27 @@ SET_THREAD_TITLE_TOOL = ToolDefinition(
 )
 
 
+CLARIFY_USER_QUESTION_TOOL = ToolDefinition(
+    name="clarify_user_question",
+    description="Ask the user a clarifying question when the request is ambiguous or you need more information to proceed. Use this tool whenever you are in doubt about what the user wants — do not guess. Present a clear question with a list of possible answers for the user to choose from.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "question": {
+                "type": "string",
+                "description": "The clarifying question to ask the user."
+            },
+            "options": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of possible answers for the user to choose from (2-6 items)."
+            }
+        },
+        "required": ["question", "options"]
+    }
+)
+
+
 class ToolExecutor:
     """
     Executes tool calls and manages tool state.
@@ -93,7 +114,8 @@ class ToolExecutor:
         self.chat_session = chat_session
         self.mcp_manager = mcp_manager
         self._tool_handlers: Dict[str, Callable] = {
-            'set_thread_title': self._handle_set_thread_title
+            'set_thread_title': self._handle_set_thread_title,
+            'clarify_user_question': self._handle_clarify_user_question,
         }
 
     def execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -206,6 +228,26 @@ class ToolExecutor:
                 "message": "Nie udało się ustawić tytułu sesji",
                 "data": None
             }
+
+
+    def _handle_clarify_user_question(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        from cli.console import show_selection_list
+        question = arguments.get('question', 'Wybierz opcję:')
+        options = arguments.get('options', [])
+
+        if not options:
+            return {"success": False, "message": "Brak opcji do wyboru", "data": None}
+
+        selected = show_selection_list(question, options)
+
+        if selected is None:
+            return {"success": False, "message": "Użytkownik anulował wybór", "data": None}
+
+        return {
+            "success": True,
+            "message": f"Użytkownik wybrał: {selected}",
+            "data": {"selected": selected}
+        }
 
 
 def should_offer_title_tool(chat_session) -> bool:
