@@ -147,20 +147,24 @@ class ChatSession:
             raise RuntimeError("LLM session not initialized")
 
         # Import tools
-        from llm.tools import should_offer_title_tool, ToolExecutor, SET_THREAD_TITLE_TOOL
+        from llm.tools import should_offer_title_tool, ToolExecutor, SET_THREAD_TITLE_TOOL, CLARIFY_USER_QUESTION_TOOL
 
-        # Build tool list: title tool (when needed) + MCP tools
+        # Build tool list: title tool (when needed) + clarify tool + MCP tools
         active_tools = []
         if should_offer_title_tool(self):
             active_tools.append(SET_THREAD_TITLE_TOOL)
+        active_tools.append(CLARIFY_USER_QUESTION_TOOL)  # Always offer
         active_tools.extend(self._mcp_tools)
 
         # Recreate session with tools if any are active
         if active_tools:
+            tool_parts = []
             if should_offer_title_tool(self):
-                console.print_info(f"🔧 Oferuję modelowi tool do tytułowania wątku...")
+                tool_parts.append("🔧 tytuł wątku")
+            tool_parts.append("❓ doprecyzowanie")
             if self._mcp_tools:
-                console.print_info(f"🔌 Oferuję modelowi {len(self._mcp_tools)} MCP tool(s)...")
+                tool_parts.append(f"🔌 {len(self._mcp_tools)} MCP tool(s)")
+            console.print_info(f"Oferuję tools: {' | '.join(tool_parts)}")
             self._llm_chat_session = self._llm_client.create_chat_session(
                 system_instruction=self.assistant.system_prompt,
                 history=self._history,
@@ -176,8 +180,12 @@ class ChatSession:
         while hasattr(response, 'has_tool_calls') and response.has_tool_calls():
             console.print_info(f"📞 Model wywołał {len(response.tool_calls)} tool(s):")
 
-            has_mcp_calls = any(tc['name'].startswith('mcp__') for tc in response.tool_calls)
-            mcp_results_for_model = []  # Collected for proper tool-result protocol
+            RESULT_RETURNING_TOOLS = {'clarify_user_question'}
+            has_result_returning_calls = any(
+                tc['name'].startswith('mcp__') or tc['name'] in RESULT_RETURNING_TOOLS
+                for tc in response.tool_calls
+            )
+            results_for_model = []
 
             for tool_call in response.tool_calls:
                 tool_name = tool_call['name']
@@ -196,17 +204,17 @@ class ChatSession:
                 else:
                     console.print_error(f"  ✗ {result['message']}")
 
-                if tool_name.startswith('mcp__'):
-                    mcp_results_for_model.append({
+                if tool_name.startswith('mcp__') or tool_name in RESULT_RETURNING_TOOLS:
+                    results_for_model.append({
                         "id": tool_id,
                         "name": tool_name,
                         "result": result
                     })
 
-            if has_mcp_calls:
+            if has_result_returning_calls:
                 # Proper tool-result protocol: send results back, model may call more tools
-                console.print_info(f"🔄 Odsyłam wyniki MCP do modelu...")
-                response = self._llm_chat_session.send_tool_results(mcp_results_for_model)
+                console.print_info(f"🔄 Odsyłam wyniki do modelu...")
+                response = self._llm_chat_session.send_tool_results(results_for_model)
             else:
                 # Fire-and-forget (e.g. set_thread_title): resend original message without tools
                 console.print_info(f"🔄 Ponownie wysyłam wiadomość bez tools aby uzyskać odpowiedź...")

@@ -76,3 +76,65 @@ def display_final_instructions(session_id: str):
     print_info(f"Aby kontynuować tę sesję (ID: {session_id}) później, użyj komendy:")
     print(Fore.WHITE + Style.BRIGHT + f"\n    python {sys.argv[0]} --session-id={session_id}\n" + Style.RESET_ALL)
     print("--------------------------------------\n")
+
+
+def show_selection_list(question: str, options: list) -> str | None:
+    """Display an inline keyboard-navigated list and return the chosen option, or None if cancelled."""
+    from prompt_toolkit import Application
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.layout import Layout
+    from prompt_toolkit.layout.containers import Window
+    from prompt_toolkit.layout.controls import FormattedTextControl
+
+    selected_index = [0]
+    result = [None]
+
+    kb = KeyBindings()
+
+    @kb.add('up')
+    def move_up(event):
+        selected_index[0] = (selected_index[0] - 1) % len(options)
+        event.app.invalidate()
+
+    @kb.add('down')
+    def move_down(event):
+        selected_index[0] = (selected_index[0] + 1) % len(options)
+        event.app.invalidate()
+
+    @kb.add('enter')
+    def confirm(event):
+        result[0] = options[selected_index[0]]
+        event.app.exit()
+
+    @kb.add('escape')
+    @kb.add('c-c')
+    def cancel(event):
+        event.app.exit()
+
+    def get_formatted_text():
+        tokens = [('class:question', f'{question}\n')]
+        for i, opt in enumerate(options):
+            if i == selected_index[0]:
+                tokens.append(('class:selected', f'  ▶ {opt}\n'))
+            else:
+                tokens.append(('', f'    {opt}\n'))
+        tokens.append(('class:hint', '  [↑↓] nawigacja  [Enter] wybierz  [Esc] anuluj'))
+        return tokens
+
+    from prompt_toolkit.styles import Style
+    style = Style.from_dict({
+        'question': 'bold ansiyellow',
+        'selected': 'bold ansicyan',
+        'hint':     'ansibrightblack',
+    })
+
+    layout = Layout(Window(FormattedTextControl(get_formatted_text)))
+    app = Application(
+        layout=layout,
+        key_bindings=kb,
+        style=style,
+        full_screen=False,
+        erase_when_done=True,
+    )
+    app.run()
+    return result[0]
