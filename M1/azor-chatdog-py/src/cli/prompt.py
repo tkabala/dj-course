@@ -11,7 +11,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import completion_is_selected
 
 # --- Configuration ---
-SLASH_COMMANDS = ('/exit', '/quit', '/switch', '/help', '/session', '/pdf', '/audio', '/audio-all')
+SLASH_COMMANDS = ('/exit', '/quit', '/switch', '/help', '/session', '/pdf', '/audio', '/audio-all', '/role')
 SESSION_SUBCOMMANDS = ['list', 'display', 'pop', 'clear', 'new', 'remove', 'title', 'rename']
 
 
@@ -92,6 +92,15 @@ class SlashCommandCompleter(Completer):
             for subcmd in SESSION_SUBCOMMANDS:
                 if subcmd.startswith(subcmd_prefix):
                     yield Completion(subcmd, start_position=-len(subcmd_prefix))
+
+        # Typing a role name argument after /role
+        elif first_word == '/role':
+            if len(parts) == 1 and text.endswith(' ') or (len(parts) == 2 and not text.endswith(' ')):
+                from assistant import ASSISTANT_REGISTRY
+                fragment = parts[1] if len(parts) == 2 else ''
+                for role_name in ASSISTANT_REGISTRY:
+                    if role_name.startswith(fragment):
+                        yield Completion(role_name, start_position=-len(fragment))
 
         # Typing a session ID argument after /switch
         elif first_word == '/switch':
