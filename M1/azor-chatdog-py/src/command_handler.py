@@ -6,7 +6,7 @@ from commands.session_to_pdf import export_session_to_pdf
 from commands.session_remove import remove_session_command
 from commands.session_rename import rename_session_command
 
-VALID_SLASH_COMMANDS = ['/exit', '/quit', '/switch', '/help', '/session', '/pdf', '/audio', '/audio-all']
+VALID_SLASH_COMMANDS = ['/exit', '/quit', '/switch', '/help', '/session', '/pdf', '/audio', '/audio-all', '/role']
 
 def handle_command(user_input: str) -> bool:
     """
@@ -84,7 +84,27 @@ def handle_command(user_input: str) -> bool:
         current = manager.get_current_session()
         generate_full_conversation_audio(current.get_history(), current.session_id, current.assistant_name)
 
+    elif command == '/role':
+        handle_role_command(parts, manager)
+
     return False
+
+
+def handle_role_command(parts, manager):
+    """Handles the /role command for switching assistants."""
+    from assistant import ASSISTANT_REGISTRY
+    current = manager.get_current_session()
+    if len(parts) == 1:
+        console.print_info(f"Aktualny asystent: {current.assistant_name}")
+        console.print_info(f"Dostępne role: {', '.join(ASSISTANT_REGISTRY.keys())}")
+    else:
+        role_name = parts[1].lower()
+        if role_name not in ASSISTANT_REGISTRY:
+            console.print_error(f"Nieznana rola: {role_name}. Dostępne: {', '.join(ASSISTANT_REGISTRY.keys())}")
+            return
+        new_assistant = ASSISTANT_REGISTRY[role_name]()
+        current.change_assistant(new_assistant)
+        console.print_info(f"Przełączono na asystenta: {new_assistant.name}")
 
 
 def handle_session_subcommand(subcommand: str, manager, parts=None):

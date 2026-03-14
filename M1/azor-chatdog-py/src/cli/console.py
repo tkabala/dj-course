@@ -68,6 +68,8 @@ def display_help(session_id: str):
     print_help("\n  /pdf              - Eksportuje sesję do PDF.")
     print_help("  /audio            - Generuje plik WAV z ostatnią odpowiedzią Azora.")
     print_help("  /audio-all        - Generuje plik WAV z całą konwersacją.")
+    print_help("\n  /role             - Wyświetla aktualną rolę i dostępne role.")
+    print_help("  /role <nazwa>     - Zmienia asystenta (azor / reksio). Historia zostaje.")
 
 
 def display_final_instructions(session_id: str):

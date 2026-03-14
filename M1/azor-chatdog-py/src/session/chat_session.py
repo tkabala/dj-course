@@ -368,3 +368,13 @@ class ChatSession:
             bool: True if title is set, False otherwise
         """
         return self._title is not None and len(self._title) > 0
+
+    def change_assistant(self, new_assistant: Assistant):
+        """
+        Switches to a new assistant, keeping the existing conversation history.
+        The new system prompt takes effect on the next message.
+        """
+        if self._llm_chat_session:
+            self._history = self._llm_chat_session.get_history()
+        self.assistant = new_assistant
+        self._initialize_llm_session()
