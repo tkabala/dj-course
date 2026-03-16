@@ -70,6 +70,7 @@ def display_help(session_id: str):
     print_help("  /audio-all        - Generuje plik WAV z całą konwersacją.")
     print_help("\n  /role             - Wyświetla aktualną rolę i dostępne role.")
     print_help("  /role <nazwa>     - Zmienia asystenta (azor / reksio). Historia zostaje.")
+    print_help("\n  /roleplay         - Uruchamia konwersację między wybranymi personami.")
 
 
 def display_final_instructions(session_id: str):
@@ -78,6 +79,45 @@ def display_final_instructions(session_id: str):
     print_info(f"Aby kontynuować tę sesję (ID: {session_id}) później, użyj komendy:")
     print(Fore.WHITE + Style.BRIGHT + f"\n    python {sys.argv[0]} --session-id={session_id}\n" + Style.RESET_ALL)
     print("--------------------------------------\n")
+
+
+def wait_for_continue() -> bool:
+    """Wait for a keypress. Returns True to continue, False if Esc was pressed."""
+    from prompt_toolkit import Application
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.layout import Layout
+    from prompt_toolkit.layout.containers import Window
+    from prompt_toolkit.layout.controls import FormattedTextControl
+
+    result = [True]
+
+    kb = KeyBindings()
+
+    @kb.add('escape')
+    def on_escape(event):
+        result[0] = False
+        event.app.exit()
+
+    @kb.add('<any>')
+    def on_any(event):
+        result[0] = True
+        event.app.exit()
+
+    from prompt_toolkit.styles import Style
+    style = Style.from_dict({'hint': 'ansibrightblack'})
+
+    layout = Layout(Window(FormattedTextControl(
+        lambda: [('class:hint', 'Naciśnij dowolny klawisz by kontynuować, Esc by zakończyć...')]
+    )))
+    app = Application(
+        layout=layout,
+        key_bindings=kb,
+        style=style,
+        full_screen=False,
+        erase_when_done=True,
+    )
+    app.run()
+    return result[0]
 
 
 def show_selection_list(question: str, options: list) -> str | None:
