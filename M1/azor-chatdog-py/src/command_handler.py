@@ -6,7 +6,7 @@ from commands.session_to_pdf import export_session_to_pdf
 from commands.session_remove import remove_session_command
 from commands.session_rename import rename_session_command
 
-VALID_SLASH_COMMANDS = ['/exit', '/quit', '/switch', '/help', '/session', '/pdf', '/audio', '/audio-all', '/role']
+VALID_SLASH_COMMANDS = ['/exit', '/quit', '/switch', '/help', '/session', '/pdf', '/audio', '/audio-all', '/role', '/roleplay']
 
 def handle_command(user_input: str) -> bool:
     """
@@ -86,6 +86,10 @@ def handle_command(user_input: str) -> bool:
 
     elif command == '/role':
         handle_role_command(parts, manager)
+
+    elif command == '/roleplay':
+        from commands.roleplay import handle_roleplay_command
+        handle_roleplay_command(parts, manager)
 
     return False
 

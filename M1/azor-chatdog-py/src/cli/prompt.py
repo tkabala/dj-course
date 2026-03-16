@@ -11,7 +11,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import completion_is_selected
 
 # --- Configuration ---
-SLASH_COMMANDS = ('/exit', '/quit', '/switch', '/help', '/session', '/pdf', '/audio', '/audio-all', '/role')
+SLASH_COMMANDS = ('/exit', '/quit', '/switch', '/help', '/session', '/pdf', '/audio', '/audio-all', '/role', '/roleplay')
 SESSION_SUBCOMMANDS = ['list', 'display', 'pop', 'clear', 'new', 'remove', 'title', 'rename']
 
 
