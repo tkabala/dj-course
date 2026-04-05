@@ -1,0 +1,47 @@
+# Dependencies (reinstalled during build)
+node_modules/
+
+# Nuxt build artifacts
+.nuxt/
+.output/
+dist/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Dev tooling
+.storybook/
+storybook-static/
+.cursor/
+.claude/
+
+# Git
+.git/
+.gitignore
+
+# Docs
+README.md
+
+# Test/coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Cache
+.npm/
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# Misc
+*.tsbuildinfo
+*.tgz
+.DS_Store
