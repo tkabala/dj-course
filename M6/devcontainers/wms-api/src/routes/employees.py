@@ -11,20 +11,22 @@ def get_employees():
         SELECT
             p.party_id AS employee_id,
             p.name AS employee_name,
-            p.contact_email AS email,
-            p.contact_phone AS phone,
+            MAX(CASE WHEN pc.type = 'EMAIL' THEN pc.details END) AS email,
+            MAX(CASE WHEN pc.type = 'PHONE' THEN pc.details END) AS phone,
             p.created_at AS hire_date,
-            STRING_AGG(r.name, ', ') AS roles
+            STRING_AGG(DISTINCT r.name, ', ') AS roles
         FROM
             party p
         JOIN
             party_role pr ON p.party_id = pr.party_id
         JOIN
             role r ON pr.role_id = r.role_id
+        LEFT JOIN
+            party_contact pc ON p.party_id = pc.party_id
         WHERE
             p.data->>'type' = 'employee'
         GROUP BY
-            p.party_id, p.name, p.contact_email, p.contact_phone, p.created_at
+            p.party_id, p.name, p.created_at
         ORDER BY
             p.name;
     ''')
@@ -40,21 +42,23 @@ def get_employee(employee_id):
         SELECT
             p.party_id AS employee_id,
             p.name AS employee_name,
-            p.contact_email AS email,
-            p.contact_phone AS phone,
+            MAX(CASE WHEN pc.type = 'EMAIL' THEN pc.details END) AS email,
+            MAX(CASE WHEN pc.type = 'PHONE' THEN pc.details END) AS phone,
             p.created_at AS hire_date,
-            STRING_AGG(r.name, ', ') AS roles
+            STRING_AGG(DISTINCT r.name, ', ') AS roles
         FROM
             party p
         JOIN
             party_role pr ON p.party_id = pr.party_id
         JOIN
             role r ON pr.role_id = r.role_id
+        LEFT JOIN
+            party_contact pc ON p.party_id = pc.party_id
         WHERE
             p.data->>'type' = 'employee'
             AND p.party_id = :employee_id
         GROUP BY
-            p.party_id, p.name, p.contact_email, p.contact_phone, p.created_at
+            p.party_id, p.name, p.created_at
         ORDER BY
             p.name;
     ''')
