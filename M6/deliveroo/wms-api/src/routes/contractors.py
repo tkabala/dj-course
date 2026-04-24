@@ -246,3 +246,23 @@ def update_contractor_status(id):
 
     logger.info(f"Updated status for contractor {id} to {new_status}")
     return jsonify({'message': f'Contractor {id} status updated successfully to {new_status}'}), 200
+
+
+@contractors_bp.route('/<int:id>', methods=['DELETE'])
+def delete_contractor(id):
+    query = text("""
+        UPDATE customer
+        SET is_deleted = true, updated_at = CURRENT_TIMESTAMP
+        WHERE customer_id = :id AND is_deleted = false
+        RETURNING customer_id;
+    """)
+    with db_engine.connect() as conn:
+        with conn.begin():
+            result = conn.execute(query, {'id': id})
+            deleted_row = result.fetchone()
+
+    if not deleted_row:
+        return jsonify({'error': f'Contractor with id {id} not found'}), 404
+
+    logger.info(f"Soft-deleted contractor {id}")
+    return jsonify({'message': f'Contractor {id} deleted successfully'}), 200
