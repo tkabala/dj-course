@@ -95,7 +95,7 @@ export const routes: Routes = [
       },
       {
         path: 'reports',
-        loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent),
+        loadComponent: () => import('./features/reports/reports-page.component').then(m => m.ReportsPageComponent),
         data: { role: 'Warehouse Manager' }
       },
       // Legacy route redirect
