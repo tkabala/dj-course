@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { RouteData, RoutePoint } from '../../model/shipments';
 import { Plus, Route, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
-import { calculateRouteDistance } from './routeUtils';
+import { calculateRouteDistance } from './route-planner.utils';
 
 interface RouteControlsProps {
   route: RouteData;
