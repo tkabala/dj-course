@@ -1,0 +1,55 @@
+---
+description: Guidelines for client-side PDF generation in the customer portal
+globs: lib/pdf/**/*.ts
+alwaysApply: true
+---
+# PDF Generation Rules
+
+## Architecture
+
+All PDF generators must live under `lib/pdf/` and use the shared abstractions in `lib/pdf/core/`.
+
+- Use `PdfDocumentBuilder` as the only entry point for creating a PDF document.
+- Never instantiate `new jsPDF()` directly inside a feature-specific generator.
+- Never draw headers, footers, logos, or page numbers manually – these are handled by the builder/template.
+
+## Abstractions
+
+| File | Responsibility |
+|---|---|
+| `core/pdfDocumentBuilder.ts` | jsPDF wrapper, page breaks, header/footer, fields, tables |
+| `core/pdfSection.ts` | `PdfSection` interface and helper factory |
+| `core/pdfLayout.ts` | Shared margins, fonts, colors, spacing |
+| `core/pdfFormatters.ts` | Date, currency, percentage, enum, boolean formatters |
+
+## Creating a new generator
+
+1. Define the input type (model) in the relevant feature slice (`features/<slice>/<model>.model.ts`).
+2. Create a dedicated generator file under `lib/pdf/<name>PdfGenerator.ts`.
+3. Build the document with `const builder = await PdfDocumentBuilder.create({ title: '...', subtitle: '...' })`.
+4. Add content using builder helpers: `sectionTitle`, `field`, `multiLineField`, `paragraph`, `table`, `renderSection`.
+5. Call `builder.save(filename)` or return `builder.toBlob()` for preview.
+
+## Sections
+
+- Extract repeatable blocks (e.g. cargo info, address info) into `PdfSection` implementations under `lib/pdf/sections/`.
+- A section must only depend on its own data and the builder; no direct jsPDF access.
+
+## Formatting
+
+- Dates: `formatDate` / `formatDateShort` / `formatDateTime`
+- Currency: `formatCurrency(amount, currency)`
+- Enums/labels: `formatEnum(value)`
+- Booleans: `formatBoolean(value)`
+- Quantities/dimensions: `formatQuantity`, `formatDimensions`
+
+## Output
+
+- Use `.save()` for user downloads.
+- Use `.toBlob()` when the PDF needs to be previewed or uploaded.
+
+## What to avoid
+
+- Hardcoded magic numbers for margins, colors, or font sizes.
+- Duplicated logo-loading or footer-drawing code.
+- Mixing data transformation with rendering logic.

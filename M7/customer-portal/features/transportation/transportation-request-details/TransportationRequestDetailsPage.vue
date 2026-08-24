@@ -314,12 +314,15 @@ const downloadPDF = async () => {
   
   try {
     // Dynamically import PDF generator only on client side
-    const { PDFGenerator } = await import('~/lib/pdf/pdfGenerator')
-    
+    const { generateTransportationRequestPDF } = await import('~/lib/pdf/transportationRequestPdfGenerator')
+
     // Small delay to show loading state
     await new Promise(resolve => setTimeout(resolve, 500))
-    
-    await PDFGenerator.generateTransportationRequestPDF(request.value)
+
+    await generateTransportationRequestPDF(request.value, {
+      requestNumber: request.value.requestNumber,
+      createdAt: request.value.createdAt
+    })
   } catch (error) {
     console.error('Error generating PDF:', error)
     alert('Error generating PDF. Please try again.')
