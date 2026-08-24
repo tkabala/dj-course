@@ -1,0 +1,45 @@
+---
+description: Guidelines for client-side PDF generation in the WMS frontend
+globs: src/app/lib/pdf/**/*.ts
+alwaysApply: true
+---
+# PDF Generation Rules
+
+## Architecture
+
+All PDF generators must live under `src/app/lib/pdf/` and use the shared abstractions in `src/app/lib/pdf/core/`.
+
+- Use `PdfDocumentBuilder` as the only entry point for creating a PDF document.
+- Never instantiate `new jsPDF()` directly inside a feature-specific generator.
+- Never draw headers, footers, logos, or page numbers manually – these are handled by the builder.
+
+## Abstractions
+
+| File | Responsibility |
+|---|---|
+| `core/pdfDocumentBuilder.ts` | jsPDF wrapper, page breaks, header/footer, fields, tables |
+| `core/pdfSection.ts` | `PdfSection` interface and helper factory |
+| `core/pdfLayout.ts` | Shared margins, fonts, colors, spacing |
+| `core/pdfFormatters.ts` | Date, currency, percentage, enum formatters |
+
+## Creating a new generator
+
+1. Define the input type in the relevant feature model file.
+2. Create a dedicated generator file under `src/app/lib/pdf/<name>PdfGenerator.ts`.
+3. Build the document with `const builder = await PdfDocumentBuilder.create({ title: '...', subtitle: '...' })`.
+4. Add content using builder helpers: `sectionTitle`, `field`, `multiLineField`, `paragraph`, `table`, `renderSection`.
+5. Call `builder.save(filename)` or return `builder.toBlob()` for preview.
+
+## Formatting
+
+- Dates: `formatDate` / `formatDateTime`
+- Currency: `formatCurrency(amount, currency)`
+- Percentages: `formatPercentage(value, fractionDigits)`
+- Enums/labels: `formatEnum(value)`
+- Booleans: `formatBoolean(value)`
+
+## What to avoid
+
+- Hardcoded magic numbers for margins, colors, or font sizes.
+- Duplicated logo-loading or footer-drawing code.
+- Mixing data transformation with rendering logic.
