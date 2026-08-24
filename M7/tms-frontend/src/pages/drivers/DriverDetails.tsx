@@ -5,12 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ArrowLeft, User, Mail, Phone, MapPin, CreditCard, FileText, AlertCircle } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, MapPin, CreditCard, FileText, AlertCircle, Truck, Clock, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useDriverDetailsQuery, useDriverShipmentsQuery } from '@/http/drivers.queries';
 import { useAtom } from 'jotai';
 import { selectedDriverAtom } from './drivers.store';
 import { Driver } from '@/model/drivers';
 import { formatDateTime, formatDate } from '@/lib/date/dateUtils';
+import { StatRing } from '@/components/ui/stat-ring';
+import { MilestoneChecklist, Milestone } from '@/components/ui/milestone-checklist';
 
 const DriverDetails = () => {
   const { id } = useParams();
@@ -49,6 +51,19 @@ const DriverDetails = () => {
   if (!driver) {
     return <div className="flex items-center justify-center h-64">Driver not found</div>;
   }
+
+  // Mock performance metrics for the adapted stat-ring widget (Zadanie 4)
+  const completedDeliveries = driver.routes.filter(r => r.status === 'completed').length;
+  const onTimeRate = 98;
+  const incidentsCount = 2;
+  const safetyScore = Math.max(0, 100 - incidentsCount * 8);
+
+  const milestones: Milestone[] = [
+    { id: 'deliveries-50', label: '50+ completed deliveries', achieved: completedDeliveries >= 50 },
+    { id: 'on-time-95', label: 'On-time rate above 95%', achieved: onTimeRate >= 95 },
+    { id: 'no-incidents', label: 'Zero incidents this quarter', achieved: incidentsCount === 0 },
+    { id: 'license-valid', label: 'License valid for 6+ months', achieved: !isLicenseExpiringSoon(driver) },
+  ];
 
   return (
     <div className="space-y-6">
@@ -242,21 +257,43 @@ const DriverDetails = () => {
       <Card>
         <CardHeader>
           <CardTitle>Performance Statistics</CardTitle>
+          <CardDescription>Adapted circular-progress stat widget</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-blue-600">{driver.routes.filter(r => r.status === 'completed').length}</p>
-              <p className="text-sm text-gray-600">Total Deliveries</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">98%</p>
-              <p className="text-sm text-gray-600">On-Time Rate</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-orange-600">2</p>
-              <p className="text-sm text-gray-600">Incidents</p>
-            </div>
+          <div className="flex flex-wrap justify-around gap-8 py-2">
+            <StatRing
+              value={Math.min(100, completedDeliveries)}
+              displayValue={`${completedDeliveries}`}
+              label="Total Deliveries"
+              variant="blue"
+              icon={<Truck className="h-4 w-4" />}
+            />
+            <StatRing
+              value={onTimeRate}
+              displayValue={`${onTimeRate}%`}
+              label="On-Time Rate"
+              variant="green"
+              icon={<Clock className="h-4 w-4" />}
+            />
+            <StatRing
+              value={safetyScore}
+              displayValue={`${safetyScore}`}
+              label="Safety Score"
+              variant="purple"
+              icon={<ShieldCheck className="h-4 w-4" />}
+            />
+            <StatRing
+              value={Math.min(100, incidentsCount * 20)}
+              displayValue={`${incidentsCount}`}
+              label="Incidents"
+              variant="orange"
+              icon={<AlertTriangle className="h-4 w-4" />}
+            />
+          </div>
+
+          <div className="mt-6 border-t pt-4">
+            <p className="text-sm font-medium text-gray-700 mb-3">Milestones</p>
+            <MilestoneChecklist milestones={milestones} className="grid grid-cols-1 md:grid-cols-2 gap-x-6" />
           </div>
         </CardContent>
       </Card>
