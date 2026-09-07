@@ -1,5 +1,10 @@
 .output
 
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
 # Logs
 logs
 *.log
@@ -141,3 +146,6 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 *storybook.log
 storybook-static
+
+# Playwright auth state (written by tests/e2e/global-setup.ts)
+/tests/e2e/.auth/

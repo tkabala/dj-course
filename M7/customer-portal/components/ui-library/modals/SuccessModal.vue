@@ -5,6 +5,9 @@
     @click="closeModal"
   >
     <div
+      role="dialog"
+      aria-modal="true"
+      :aria-label="title"
       class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all"
       @click.stop
     >

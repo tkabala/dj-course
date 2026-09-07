@@ -2,9 +2,11 @@ import { defineStore } from 'pinia'
 import type { SubmitTransportationRequestForm } from './submit-transportation-request.model'
 import { submitTransportationRequest } from './submit-transportation-request-api'
 
-// Track which steps have been completed
-interface CompletedSteps {
-  [key: number]: boolean;
+// Fields the user has already visited, keyed the same way as validationErrors.
+// A field's error message stays hidden until it is touched, so the form does not
+// greet the user with a wall of red on a step they have not filled in yet.
+interface TouchedFields {
+  [field: string]: boolean;
 }
 
 export const useTransportationRequestStore = defineStore('transportationRequest', {
@@ -15,7 +17,11 @@ export const useTransportationRequestStore = defineStore('transportationRequest'
     success: false,
     error: null as string | null,
     requestNumber: '',
-    completedSteps: {} as CompletedSteps,
+    // The furthest step reached so far. Steps behind it stay reachable through
+    // the progress timeline, including the review step a user leaves through one
+    // of its "Edit" shortcuts.
+    furthestStep: 1,
+    touchedFields: {} as TouchedFields,
     form: {
       serviceType: '',
       pickupLocation: {
@@ -94,9 +100,9 @@ export const useTransportationRequestStore = defineStore('transportationRequest'
       ]
       return icons[state.currentStep - 1]
     },
-    isStepValid: (state) => {
-      // Check if the current step is valid
-      switch (state.currentStep) {
+    // Whether a given step has all of its required fields filled in
+    isStepComplete: (state) => (step: number): boolean => {
+      switch (step) {
         case 1: // Service Type
           return Boolean(state.form.serviceType)
         case 2: // Pickup Information
@@ -124,31 +130,41 @@ export const useTransportationRequestStore = defineStore('transportationRequest'
         case 5: // Special Instructions
           return true // No required fields
         case 6: // Review & Submit
-          return true // All validations already passed
+          return true // Nothing of its own to fill in
         default:
           return false
       }
     },
-    // Check if a specific step is accessible
-    canAccessStep: (state) => (step: number) => {
-      // First step is always accessible
-      if (step === 1) {
-        return true
-      }
-      
-      // Current step and previous steps are accessible
-      if (step <= state.currentStep) {
-        return true
-      }
-      
-      // Completed steps are accessible
-      if (state.completedSteps[step]) {
-        return true
-      }
-      
-      return false
+
+    isStepValid(): boolean {
+      return this.isStepComplete(this.currentStep)
     },
-    
+
+    /**
+     * Whether a specific step can be opened from the progress timeline: it has
+     * to have been reached before, and everything in front of it has to still be
+     * complete - so leaving a step half-filled locks the ones behind it again.
+     */
+    canAccessStep(): (step: number) => boolean {
+      return (step: number) => {
+        if (step === 1) {
+          return true
+        }
+
+        if (step > this.furthestStep) {
+          return false
+        }
+
+        for (let earlier = 1; earlier < step; earlier++) {
+          if (!this.isStepComplete(earlier)) {
+            return false
+          }
+        }
+
+        return true
+      }
+    },
+
     // Get validation errors for the current step
     validationErrors: (state) => {
       const errors: Record<string, string> = {};
@@ -208,25 +224,52 @@ export const useTransportationRequestStore = defineStore('transportationRequest'
           }
           break;
       }
-      
+
       return errors;
+    },
+
+    /**
+     * The subset of validationErrors the form is allowed to show: a field only
+     * complains once the user has actually been there. This is what the template
+     * binds to - validationErrors itself stays the complete, untouched picture.
+     */
+    visibleValidationErrors(): Record<string, string> {
+      const visible: Record<string, string> = {}
+
+      for (const [field, message] of Object.entries(this.validationErrors)) {
+        if (this.touchedFields[field]) {
+          visible[field] = message
+        }
+      }
+
+      return visible
     }
   },
 
   actions: {
     nextStep() {
       if (this.currentStep < this.totalSteps && this.isStepValid) {
-        // Mark current step as completed
-        this.completedSteps[this.currentStep] = true
         this.currentStep++
+        this.furthestStep = Math.max(this.furthestStep, this.currentStep)
       }
     },
-    
+
     validateCurrentStep() {
       // Return true if the step is valid, false otherwise
       return Object.keys(this.validationErrors).length === 0;
     },
-    
+
+    markTouched(field: string) {
+      this.touchedFields[field] = true
+    },
+
+    /** Reveals every outstanding error of the current step at once. */
+    touchCurrentStepFields() {
+      for (const field of Object.keys(this.validationErrors)) {
+        this.markTouched(field)
+      }
+    },
+
     prevStep() {
       if (this.currentStep > 1) {
         this.currentStep--
@@ -261,10 +304,11 @@ export const useTransportationRequestStore = defineStore('transportationRequest'
     },
     resetForm() {
       this.currentStep = 1
+      this.furthestStep = 1
       this.success = false
       this.error = null
       this.requestNumber = ''
-      this.completedSteps = {}
+      this.touchedFields = {}
       this.form = {
         serviceType: '',
         pickupLocation: {

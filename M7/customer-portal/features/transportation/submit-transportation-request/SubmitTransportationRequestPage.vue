@@ -10,8 +10,8 @@
     </div>
 
     <!-- Form Progress Timeline -->
-    <div class="mb-8">
-      <ShipmentTimeline 
+    <div class="mb-8" data-testid="wizard-timeline">
+      <ShipmentTimeline
         :shipment-data="timelineData" 
         @status-change="handleStepChange"
         :disabled-steps="disabledSteps"
@@ -47,6 +47,7 @@
               :value="service.value"
               class="sr-only"
               required
+              @change="store.markTouched('serviceType')"
             />
             <div class="flex items-center">
               <div class="text-sm">
@@ -69,15 +70,17 @@
       <div v-if="store.currentStep === 2">
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div class="sm:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="pickup-street" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Pickup Address *
             </label>
             <input
+              id="pickup-street"
               v-model="store.form.pickupLocation.address.street"
               type="text"
               required
               :class="['input', validationErrors['pickupLocation.address.street'] ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : '']"
               placeholder="Enter pickup address"
+              @blur="store.markTouched('pickupLocation.address.street')"
             />
             <div v-if="validationErrors['pickupLocation.address.street']" class="text-red-500 text-sm mt-1">
               {{ validationErrors['pickupLocation.address.street'] }}
@@ -85,15 +88,17 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="pickup-city" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               City *
             </label>
             <input
+              id="pickup-city"
               v-model="store.form.pickupLocation.address.city"
               type="text"
               required
               :class="['input', validationErrors['pickupLocation.address.city'] ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : '']"
               placeholder="Enter city"
+              @blur="store.markTouched('pickupLocation.address.city')"
             />
             <div v-if="validationErrors['pickupLocation.address.city']" class="text-red-500 text-sm mt-1">
               {{ validationErrors['pickupLocation.address.city'] }}
@@ -101,13 +106,15 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="pickup-country" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Country *
             </label>
             <select
+              id="pickup-country"
               v-model="store.form.pickupLocation.address.country"
               required
               :class="['input', validationErrors['pickupLocation.address.country'] ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : '']"
+              @blur="store.markTouched('pickupLocation.address.country')"
             >
               <option value="">Select country</option>
               <option value="Poland">Poland</option>
@@ -126,15 +133,17 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="pickup-contact-person" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Contact Person *
             </label>
             <input
+              id="pickup-contact-person"
               v-model="store.form.pickupLocation.contactPerson"
               type="text"
               required
               :class="['input', validationErrors['pickupLocation.contactPerson'] ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : '']"
               placeholder="Contact person name"
+              @blur="store.markTouched('pickupLocation.contactPerson')"
             />
             <div v-if="validationErrors['pickupLocation.contactPerson']" class="text-red-500 text-sm mt-1">
               {{ validationErrors['pickupLocation.contactPerson'] }}
@@ -142,15 +151,17 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="pickup-contact-phone" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Contact Phone *
             </label>
             <input
+              id="pickup-contact-phone"
               v-model="store.form.pickupLocation.contactPhone"
               type="tel"
               required
               :class="['input', validationErrors['pickupLocation.contactPhone'] ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : '']"
               placeholder="Phone number"
+              @blur="store.markTouched('pickupLocation.contactPhone')"
             />
             <div v-if="validationErrors['pickupLocation.contactPhone']" class="text-red-500 text-sm mt-1">
               {{ validationErrors['pickupLocation.contactPhone'] }}
@@ -158,14 +169,16 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="requested-pickup-date" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Preferred Pickup Date *
             </label>
             <input
+              id="requested-pickup-date"
               v-model="store.form.requestedPickupDate"
               type="date"
               required
               :class="['input', validationErrors['requestedPickupDate'] ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : '']"
+              @blur="store.markTouched('requestedPickupDate')"
             />
             <div v-if="validationErrors['requestedPickupDate']" class="text-red-500 text-sm mt-1">
               {{ validationErrors['requestedPickupDate'] }}
@@ -173,10 +186,11 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="pickup-loading-type" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Loading Type
             </label>
             <select
+              id="pickup-loading-type"
               v-model="store.form.pickupLocation.loadingType"
               class="input"
             >
@@ -193,15 +207,17 @@
       <div v-if="store.currentStep === 3">
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div class="sm:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="delivery-street" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Delivery Address *
             </label>
             <input
+              id="delivery-street"
               v-model="store.form.deliveryLocation.address.street"
               type="text"
               required
               :class="['input', validationErrors['deliveryLocation.address.street'] ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : '']"
               placeholder="Enter delivery address"
+              @blur="store.markTouched('deliveryLocation.address.street')"
             />
             <div v-if="validationErrors['deliveryLocation.address.street']" class="text-red-500 text-sm mt-1">
               {{ validationErrors['deliveryLocation.address.street'] }}
@@ -209,15 +225,17 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="delivery-city" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               City *
             </label>
             <input
+              id="delivery-city"
               v-model="store.form.deliveryLocation.address.city"
               type="text"
               required
               :class="['input', validationErrors['deliveryLocation.address.city'] ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : '']"
               placeholder="Enter city"
+              @blur="store.markTouched('deliveryLocation.address.city')"
             />
             <div v-if="validationErrors['deliveryLocation.address.city']" class="text-red-500 text-sm mt-1">
               {{ validationErrors['deliveryLocation.address.city'] }}
@@ -225,13 +243,15 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="delivery-country" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Country *
             </label>
             <select
+              id="delivery-country"
               v-model="store.form.deliveryLocation.address.country"
               required
               :class="['input', validationErrors['deliveryLocation.address.country'] ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : '']"
+              @blur="store.markTouched('deliveryLocation.address.country')"
             >
               <option value="">Select country</option>
               <option value="Poland">Poland</option>
@@ -250,15 +270,17 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="delivery-contact-person" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Contact Person *
             </label>
             <input
+              id="delivery-contact-person"
               v-model="store.form.deliveryLocation.contactPerson"
               type="text"
               required
               :class="['input', validationErrors['deliveryLocation.contactPerson'] ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : '']"
               placeholder="Contact person name"
+              @blur="store.markTouched('deliveryLocation.contactPerson')"
             />
             <div v-if="validationErrors['deliveryLocation.contactPerson']" class="text-red-500 text-sm mt-1">
               {{ validationErrors['deliveryLocation.contactPerson'] }}
@@ -266,15 +288,17 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="delivery-contact-phone" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Contact Phone *
             </label>
             <input
+              id="delivery-contact-phone"
               v-model="store.form.deliveryLocation.contactPhone"
               type="tel"
               required
               :class="['input', validationErrors['deliveryLocation.contactPhone'] ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : '']"
               placeholder="Phone number"
+              @blur="store.markTouched('deliveryLocation.contactPhone')"
             />
             <div v-if="validationErrors['deliveryLocation.contactPhone']" class="text-red-500 text-sm mt-1">
               {{ validationErrors['deliveryLocation.contactPhone'] }}
@@ -282,10 +306,11 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="requested-delivery-date" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Preferred Delivery Date
             </label>
             <input
+              id="requested-delivery-date"
               v-model="store.form.requestedDeliveryDate"
               type="date"
               class="input"
@@ -293,10 +318,11 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="delivery-unloading-type" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Unloading Type
             </label>
             <select
+              id="delivery-unloading-type"
               v-model="store.form.deliveryLocation.loadingType"
               class="input"
             >
@@ -313,15 +339,17 @@
       <div v-if="store.currentStep === 4">
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div class="sm:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="cargo-description" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Cargo Description *
             </label>
             <textarea
+              id="cargo-description"
               v-model="store.form.cargo.description"
               rows="3"
               required
               :class="['input', validationErrors['cargo.description'] ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : '']"
               placeholder="Describe the cargo to be transported"
+              @blur="store.markTouched('cargo.description')"
             ></textarea>
             <div v-if="validationErrors['cargo.description']" class="text-red-500 text-sm mt-1">
               {{ validationErrors['cargo.description'] }}
@@ -329,10 +357,11 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="cargo-type" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Cargo Type
             </label>
             <select
+              id="cargo-type"
               v-model="store.form.cargo.cargoType"
               class="input"
             >
@@ -345,16 +374,18 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="cargo-weight" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Weight (kg) *
             </label>
             <input
+              id="cargo-weight"
               v-model.number="store.form.cargo.weight"
               type="number"
               min="0"
               required
               :class="['input', validationErrors['cargo.weight'] ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : '']"
               placeholder="Enter weight in kg"
+              @blur="store.markTouched('cargo.weight')"
             />
             <div v-if="validationErrors['cargo.weight']" class="text-red-500 text-sm mt-1">
               {{ validationErrors['cargo.weight'] }}
@@ -362,10 +393,11 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="cargo-packaging" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Packaging Type
             </label>
             <select
+              id="cargo-packaging"
               v-model="store.form.cargo.packaging"
               class="input"
             >
@@ -378,10 +410,11 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="cargo-quantity" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Quantity
             </label>
             <input
+              id="cargo-quantity"
               v-model.number="store.form.cargo.quantity"
               type="number"
               min="1"
@@ -391,10 +424,11 @@
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="cargo-value" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Estimated Value (EUR)
             </label>
             <input
+              id="cargo-value"
               v-model.number="store.form.cargo.value"
               type="number"
               min="0"
@@ -439,10 +473,11 @@
       <!-- Step 5: Special Instructions -->
       <div v-if="store.currentStep === 5">
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label for="special-instructions" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Special Instructions
           </label>
           <textarea
+            id="special-instructions"
             v-model="store.form.specialInstructions"
             rows="4"
             class="input"
@@ -501,8 +536,9 @@
           <div class="border-b border-gray-200 dark:border-gray-700 pb-4">
             <div class="flex justify-between items-center">
               <h3 class="text-lg font-medium text-gray-900 dark:text-white">Service Type</h3>
-              <button 
-                @click="store.goToStep(1)" 
+              <button
+                aria-label="Edit Service Type"
+                @click="store.goToStep(1)"
                 class="text-sm text-primary-600 hover:text-primary-500 dark:text-primary-400"
               >
                 Edit
@@ -517,8 +553,9 @@
           <div class="border-b border-gray-200 dark:border-gray-700 pb-4">
             <div class="flex justify-between items-center">
               <h3 class="text-lg font-medium text-gray-900 dark:text-white">Pickup Information</h3>
-              <button 
-                @click="store.goToStep(2)" 
+              <button
+                aria-label="Edit Pickup Information"
+                @click="store.goToStep(2)"
                 class="text-sm text-primary-600 hover:text-primary-500 dark:text-primary-400"
               >
                 Edit
@@ -537,8 +574,9 @@
           <div class="border-b border-gray-200 dark:border-gray-700 pb-4">
             <div class="flex justify-between items-center">
               <h3 class="text-lg font-medium text-gray-900 dark:text-white">Delivery Information</h3>
-              <button 
-                @click="store.goToStep(3)" 
+              <button
+                aria-label="Edit Delivery Information"
+                @click="store.goToStep(3)"
                 class="text-sm text-primary-600 hover:text-primary-500 dark:text-primary-400"
               >
                 Edit
@@ -559,8 +597,9 @@
           <div class="border-b border-gray-200 dark:border-gray-700 pb-4">
             <div class="flex justify-between items-center">
               <h3 class="text-lg font-medium text-gray-900 dark:text-white">Cargo Information</h3>
-              <button 
-                @click="store.goToStep(4)" 
+              <button
+                aria-label="Edit Cargo Information"
+                @click="store.goToStep(4)"
                 class="text-sm text-primary-600 hover:text-primary-500 dark:text-primary-400"
               >
                 Edit
@@ -587,8 +626,9 @@
           <div>
             <div class="flex justify-between items-center">
               <h3 class="text-lg font-medium text-gray-900 dark:text-white">Special Instructions</h3>
-              <button 
-                @click="store.goToStep(5)" 
+              <button
+                aria-label="Edit Special Instructions"
+                @click="store.goToStep(5)"
                 class="text-sm text-primary-600 hover:text-primary-500 dark:text-primary-400"
               >
                 Edit
@@ -677,7 +717,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useTransportationRequestStore } from './submit-transportation-request-store'
 import ShipmentTimeline from '~/features/transportation/shipment-details/ShipmentTimeline.vue'
@@ -790,9 +830,10 @@ const disabledSteps = computed(() => {
   return disabled
 })
 
-// Computed property to get validation errors
+// Computed property to get validation errors. Only the touched ones: an
+// untouched step shows no errors, so the form does not open in an error state.
 const validationErrors = computed(() => {
-  return store.validationErrors
+  return store.visibleValidationErrors
 })
 
 // Methods
@@ -808,8 +849,9 @@ const handleNextStep = () => {
   if (store.validateCurrentStep()) {
     store.nextStep()
   } else {
-    // Force validation to show errors
-    forceValidation.value = true
+    // Next is disabled while the step is incomplete, so this is a safety net:
+    // if it is ever reachable, say what is missing instead of doing nothing.
+    store.touchCurrentStepFields()
   }
 }
 
@@ -896,9 +938,6 @@ const formatPackaging = (packaging: string) => {
 const formatPriority = (priority: string) => {
   return priority.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
 }
-
-// State for forcing validation display
-const forceValidation = ref(false)
 
 // Initialize the store on component mount
 onMounted(() => {
